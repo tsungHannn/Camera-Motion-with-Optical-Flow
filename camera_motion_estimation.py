@@ -17,112 +17,112 @@ from scipy.stats import mode
 from sklearn.cluster import KMeans
 from collections import Counter
 
-# This function allows to calculate optical flow trajectories (Don't remember where I actually found the source code)
-# The code also allows to specify step value. The greater the value the more sparse the calculation and visualisation
-def calc_angl_n_transl(img, flow, step=8):
+# # This function allows to calculate optical flow trajectories (Don't remember where I actually found the source code)
+# # The code also allows to specify step value. The greater the value the more sparse the calculation and visualisation
+# def calc_angl_n_transl(img, flow, step=8):
 
-    '''
-    input:
-        - img - numpy array - image
-        - flow - numpy array - optical flow
-        - step - int - measurement of sparsity
-    output:
-        - angles - numpy array - array of angles of optical flow lines to the x-axis
-        - translation - numpy array - array of length values for optical flow lines
-        - lines - list - list of actual optical flow lines (where each line represents a trajectory of
-        a particular point in the image)
-    '''
+#     '''
+#     input:
+#         - img - numpy array - image
+#         - flow - numpy array - optical flow
+#         - step - int - measurement of sparsity
+#     output:
+#         - angles - numpy array - array of angles of optical flow lines to the x-axis
+#         - translation - numpy array - array of length values for optical flow lines
+#         - lines - list - list of actual optical flow lines (where each line represents a trajectory of
+#         a particular point in the image)
+#     '''
 
-    angles = []
-    translation = []
+#     angles = []
+#     translation = []
 
-    h, w = img.shape[:2]
-    y, x = np.mgrid[step/2:h:step, step/2:w:step].reshape(2,-1).astype(int)
-    fx, fy = flow[y,x].T
-    lines = np.vstack([x, y, x+fx, y+fy]).T.reshape(-1, 2, 2)
-    lines = np.int32(lines + 0.5)
+#     h, w = img.shape[:2]
+#     y, x = np.mgrid[step/2:h:step, step/2:w:step].reshape(2,-1).astype(int)
+#     fx, fy = flow[y,x].T
+#     lines = np.vstack([x, y, x+fx, y+fy]).T.reshape(-1, 2, 2)
+#     lines = np.int32(lines + 0.5)
 
-    for (x1, y1), (x2, y2) in lines:
-        angle = math.atan2(- int(y2) + int(y1), int(x2) - int(x1)) * 180.0 / np.pi
-        length = math.hypot(int(x2) - int(x1), - int(y2) + int(y1)) # hypot(x, y) would return sqrt(x*x + y*y)
-        translation.append(length)
-        angles.append(angle)
+#     for (x1, y1), (x2, y2) in lines:
+#         angle = math.atan2(- int(y2) + int(y1), int(x2) - int(x1)) * 180.0 / np.pi
+#         length = math.hypot(int(x2) - int(x1), - int(y2) + int(y1)) # hypot(x, y) would return sqrt(x*x + y*y)
+#         translation.append(length)
+#         angles.append(angle)
 
-    return np.array(angles), np.array(translation), lines
+#     return np.array(angles), np.array(translation), lines
 
-# function for drawing optical flow trajectories
-def draw_flow(img, lines):
+# # function for drawing optical flow trajectories
+# def draw_flow(img, lines):
 
-    '''
-    input:
-        - img - numpy array - image to draw on
-        - lines - list - list of lines to draw
-        - BGR image with visualised optical flow
-    '''
+#     '''
+#     input:
+#         - img - numpy array - image to draw on
+#         - lines - list - list of lines to draw
+#         - BGR image with visualised optical flow
+#     '''
 
-    width_delay_ratio = 6
-    height_delay_ratio = 5
+#     width_delay_ratio = 6
+#     height_delay_ratio = 5
 
-    h, w = img.shape[:2]
+#     h, w = img.shape[:2]
 
-    vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
-    cv.polylines(vis, lines, 0, (0, 255, 0))
+#     vis = cv.cvtColor(img, cv.COLOR_GRAY2BGR)
+#     cv.polylines(vis, lines, 0, (0, 255, 0))
 
-    for (x1, y1), (x2, y2) in lines:
-        cv.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
+#     for (x1, y1), (x2, y2) in lines:
+#         cv.circle(vis, (x1, y1), 1, (0, 255, 0), -1)
 
-    return vis
+#     return vis
 
-# function that analyses optical flow information
-def estimate_motion(angles, translation):
+# # function that analyses optical flow information
+# def estimate_motion(angles, translation):
 
-    '''
-    Input:
-        - angles - numpy array - array of angles of optical flow lines to the x-axis
-        - translation - numpy array - array of length values for optical flow lines
-    Output:
-        - ang_mode - float - mode of angles of trajectories. can be used to determine the direction of movement
-        - transl_mode - float - mode of translation values
-        - ratio - float - shows how different values of translation are across a pair of frames. allows to
-        conclude about the type of movement
-        - steady - bool - show if there is almost no movement on the video at the moment
-    '''
+#     '''
+#     Input:
+#         - angles - numpy array - array of angles of optical flow lines to the x-axis
+#         - translation - numpy array - array of length values for optical flow lines
+#     Output:
+#         - ang_mode - float - mode of angles of trajectories. can be used to determine the direction of movement
+#         - transl_mode - float - mode of translation values
+#         - ratio - float - shows how different values of translation are across a pair of frames. allows to
+#         conclude about the type of movement
+#         - steady - bool - show if there is almost no movement on the video at the moment
+#     '''
 
-    # Get indices of nonzero opical flow values. We'll use just them
-    nonzero = np.where(translation > 0)
+#     # Get indices of nonzero opical flow values. We'll use just them
+#     nonzero = np.where(translation > 0)
 
-    # Whether non-zero value is close to zero or not. Should be set as a thershold
-    steady = np.mean(translation) < 0.5
+#     # Whether non-zero value is close to zero or not. Should be set as a thershold
+#     steady = np.mean(translation) < 0.5
 
-    translation = translation[nonzero]
+#     translation = translation[nonzero]
 
-    transl_mode = mode(translation)[0]  # mode: 尋找出現次數最多的成員
+#     transl_mode = mode(translation)[0]  # mode: 尋找出現次數最多的成員
 
-    angles = angles[nonzero]
-    ang_mode = mode(angles)[0]
+#     angles = angles[nonzero]
+#     ang_mode = mode(angles)[0]
 
-    # cutt off twenty percent of the sorted list from both sides to get rid off outliers
-    ten_percent = len(translation) // 10
-    translations = sorted(translation)
-    translations = translations[ten_percent: len(translations) - ten_percent]
+#     # cutt off twenty percent of the sorted list from both sides to get rid off outliers
+#     ten_percent = len(translation) // 10
+#     translations = sorted(translation)
+#     translations = translations[ten_percent: len(translations) - ten_percent]
 
 
-    # cluster optical flow values and find out how different these cluster are
-    # big difference (i.e. big ratio value) corresponds to panning, otherwise - trucking
+#     # cluster optical flow values and find out how different these cluster are
+#     # big difference (i.e. big ratio value) corresponds to panning, otherwise - trucking
 
-    inliers = [tuple([inlier]) for inlier in translations]
+#     inliers = [tuple([inlier]) for inlier in translations]
 
-    ratio = 0
+#     ratio = 0
 
-    if len(inliers) > 3 :
-        k_means = KMeans(n_clusters=3, random_state=0, n_init='auto').fit(inliers)
-        centers = sorted(k_means.cluster_centers_)
-        ratio = centers[0] / centers[-1]
+#     if len(inliers) > 3 :
+#         k_means = KMeans(n_clusters=3, random_state=0, n_init='auto').fit(inliers)
+#         centers = sorted(k_means.cluster_centers_)
+#         ratio = centers[0] / centers[-1]
     
-    return ang_mode, transl_mode, ratio, steady
+#     return ang_mode, transl_mode, ratio, steady
 
 # =============================================================================================================
-angleThreshold = 5
+angleThreshold = 10
 translThreshold = 1
 
 def calculateOpticalFlow(frame_id, img, flow, step=8):
@@ -201,7 +201,7 @@ def estimate_turning(angles, translation):
     angles = angles[nonzero]
     nonvertical = np.where(abs(abs(angles) - 90) > angleThreshold)
     
-    # angles = angles[nonvertical]
+    angles = angles[nonvertical]
     if(len(angles) > 0):
         ang_mode = mode(angles)[0][0]
     else:
@@ -266,194 +266,198 @@ def estimate_turning(angles, translation):
 
 # specify directory and file name
 dir_path = "mvs_mp4"
-filename = "test_2024-03-18-07-57-26_mvs_compressed.mp4"
 
-# initialise stream from video
-cap = cv.VideoCapture(os.path.join(dir_path, filename))
-print(os.path.join(dir_path, filename))
-print(cap.isOpened())
-ret, prvs = cap.read()
+all_file = os.listdir(dir_path)
 
-# initialise video writer
-frameRate = int(cap.get(cv.CAP_PROP_FPS))
-codec = cv.VideoWriter_fourcc(*'mp4v')
-save_name = "motion_" + filename[:-4] + ".mp4"
-outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+for file in all_file:
+    filename = file
 
-# set parameters for text drawn on the frames
-font = cv.FONT_HERSHEY_COMPLEX
-fontScale = 1
-fontColor = (68, 148, 213)
-lineType  = 3
+    # initialise stream from video
+    cap = cv.VideoCapture(os.path.join(dir_path, filename))
+    print(os.path.join(dir_path, filename))
+    print(cap.isOpened())
+    ret, prvs = cap.read()
 
-# initialise text variables to draw on frames
-angle = 'None'
-translation = 'None'
-motion = 'None'
-motion_type = 'None'
-motion_list = []
-motion_index = -1
-realMotion = 'None'
-# set counter value
-# count = 1
+    # initialise video writer
+    frameRate = int(cap.get(cv.CAP_PROP_FPS))
+    codec = cv.VideoWriter_fourcc(*'mp4v')
+    save_name = "motion_" + filename[:-4] + ".mp4"
+    outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
 
-frame_id = 0
-frame_width = int(cap.get(3))
-frame_height = int(cap.get(4))
-left_width = frame_width // 4
-left_top = frame_height // 10
-left_height = frame_width // 2
+    # set parameters for text drawn on the frames
+    font = cv.FONT_HERSHEY_COMPLEX
+    fontScale = 1
+    fontColor = (68, 148, 213)
+    lineType  = 3
 
-# main loop
-while True:
-    # read a new frame
-    ret, nxt = cap.read()
+    # initialise text variables to draw on frames
+    angle = 'None'
+    translation = 'None'
+    motion = 'None'
+    motion_type = 'None'
+    motion_list = []
+    motion_index = -1
+    realMotion = 'None'
+    # set counter value
+    # count = 1
 
-    if not ret:
-        break
+    frame_id = 0
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    left_width = frame_width // 4
+    left_top = frame_height // 10
+    left_height = frame_width // 2 #=======================> 寫錯了  但結果很不錯
 
-    # if the image is colored
-    if len(prvs.shape) == 3:
-        prvs_gray = cv.cvtColor(prvs.copy(), cv.COLOR_BGR2GRAY)
-        next_gray = cv.cvtColor(nxt.copy(), cv.COLOR_BGR2GRAY)
-    else:
-        prvs_gray = prvs.copy()
-        next_gray = nxt.copy()
-
-    left_img = next_gray[left_top:left_height, :left_width]
-    right_img = next_gray[left_top:left_height, left_width*3:]
-    left_prvs = prvs_gray[left_top:left_height, :left_width]
-    right_prvs = prvs_gray[left_top:left_height, left_width*3:]
-
-    # cv.imshow('Left Image', left_img)
-    # cv.imshow('Right Image', right_img)
-    # if cv.waitKey(1) & 0xFF == ord('q'):
-    #     break
-
-    if frame_id % 2 == 0:
-
-        # # calculate optical flow
-        # flow = cv.calcOpticalFlowFarneback(prvs_gray, next_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-
-        left_flow = cv.calcOpticalFlowFarneback(left_prvs, left_img, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-        right_flow = cv.calcOpticalFlowFarneback(right_prvs, right_img, None, 0.5, 3, 15, 3, 5, 1.2, 0)
-        # inst = cv.optflow.createOptFlow_DeepFlow()
-        # left_flow = inst.calc(left_prvs, left_img, None)
-        # right_flow = inst.calc(right_prvs, right_img, None)
-    
-
-        # # calculate trajectories and analyse them
-        # angles, transl, lines = calculateOpticalFlow(frame_id, prvs_gray, flow)
-        left_angles, left_transl, left_lines = calculateOpticalFlow(frame_id, left_prvs, left_flow)
-        right_angles, right_transl, right_lines = calculateOpticalFlow(frame_id, right_prvs, right_flow)
-
-        # ang_mode, transl_mode, ratio, steady = estimate_turning(angles, transl)
-        left_ang_mode, left_transl_mode= estimate_turning(left_angles, left_transl)
-        right_ang_mode, right_transl_mode = estimate_turning(right_angles, right_transl)
-
-        leftAngle = str(np.round(left_ang_mode, 2))
-        rightAngle = str(np.round(right_ang_mode, 2))
-        cv.putText(left_img, leftAngle, (10,50), font, fontScale, fontColor, lineType)
-        cv.putText(right_img, rightAngle, (10,50), font, fontScale, fontColor, lineType)
-        left_line=[]
-        right_line=[]
-        for l in left_lines:
-            tempAngle = math.atan2(-l[1][1] + l[0][1], l[1][0] - l[0][0]) * 180.0 / np.pi
-            tempTransl = math.hypot(l[1][0] - l[0][0], l[1][1] + l[0][1])
-            if tempTransl > translThreshold and abs(abs(tempAngle) - 90) > angleThreshold:
-                left_line.append(l)
-
-        for l in right_lines:
-            tempAngle = math.atan2(-l[1][1] + l[0][1], l[1][0] - l[0][0]) * 180.0 / np.pi
-            tempTransl = math.hypot(l[1][0] - l[0][0], l[1][1] + l[0][1])
-            if tempTransl > translThreshold and abs(abs(tempAngle) - 90) > angleThreshold:
-                right_line.append(l)
-    
-
-
-        left_img = cv.polylines(left_img, left_line, 0, (0, 0, 255))
-        right_img = cv.polylines(right_img, right_line, 0, (0, 0, 255))
-
-        cv.imshow('left Image', left_img)
-        cv.imshow('Right Image', right_img)
-        # cv.imwrite(r'left\\left'+str(frame_id)+'.jpg', left_img)
-        # cv.imwrite(r'right\\right'+str(frame_id)+'.jpg', right_img)
-        if cv.waitKey(1) & 0xFF == ord('q'):
+    # main loop
+    while True:
+        # read a new frame
+        ret, nxt = cap.read()
+        
+        if not ret:
             break
-        # draw trajectories on the frame
-#         next_gray = draw_flow(next_gray.copy(), lines)
-        
 
-#         angle = str(round(ang_mode, 2))
-#         translation = str(round(transl_mode, 2))
-        # motion = 'No motion' if steady else round(ratio[0], 2)
-        # if isinstance(motion, float):
-        #     motion_type = 'Panning' if motion > 0.6 else 'Trucking'
-        motion = "No Motion"
-        if(float(leftAngle) == -1 or float(rightAngle) == -1):
-            pass
-        elif(left_transl_mode > 0 and right_transl_mode > 0):
-            if (float(leftAngle) >= 90 and float(leftAngle) <= 180) or (float(leftAngle) <= -90 and float(leftAngle) >= -180):  #左邊往左
-                if(float(rightAngle) >=0 and float(rightAngle) <= 90) or (float(rightAngle) >= -90 and float(rightAngle) <= 0): #右邊往右
-                    motion = "Straight"
-                    motion_list.append("Straight")
-                elif(float(rightAngle) >= 90 and float(rightAngle) <= 180) or (float(rightAngle) <= -90 and float(rightAngle) >= -180): #右邊往左
-                    motion = "Right"
-                    motion_list.append("Right")
-            elif(float(leftAngle) >=0 and float(leftAngle) <= 90) or (float(leftAngle) >= -90 and float(leftAngle) <= 0):   #左邊往右
-                if(float(rightAngle) >=0 and float(rightAngle) <= 90) or (float(rightAngle) >= -90 and float(rightAngle) <= 0): #右邊往右
-                    motion = "Left"
-                    motion_list.append("Left")
-                elif(float(rightAngle) >= 90 and float(rightAngle) <= 180) or (float(rightAngle) <= -90 and float(rightAngle) >= -180): #右邊往左
-                    motion = "Back"
-                    motion_list.append("Back")
-            
-            motion_index += 1
+        # if the image is colored
+        if len(prvs.shape) == 3:
+            prvs_gray = cv.cvtColor(prvs.copy(), cv.COLOR_BGR2GRAY)
+            next_gray = cv.cvtColor(nxt.copy(), cv.COLOR_BGR2GRAY)
         else:
-            motion_list.append("No Motion")
+            prvs_gray = prvs.copy()
+            next_gray = nxt.copy()
+
+        left_img = next_gray[left_top:left_height, :left_width]
+        right_img = next_gray[left_top:left_height, left_width*3:]
+        left_prvs = prvs_gray[left_top:left_height, :left_width]
+        right_prvs = prvs_gray[left_top:left_height, left_width*3:]
+
+        # cv.imshow('Left Image', left_img)
+        # cv.imshow('Right Image', right_img)
+        # if cv.waitKey(1) & 0xFF == ord('q'):
+        #     break
+
+        if frame_id % 3 == 0:
+
+            # # calculate optical flow
+            # flow = cv.calcOpticalFlowFarneback(prvs_gray, next_gray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+
+            left_flow = cv.calcOpticalFlowFarneback(left_prvs, left_img, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            right_flow = cv.calcOpticalFlowFarneback(right_prvs, right_img, None, 0.5, 3, 15, 3, 5, 1.2, 0)
+            # inst = cv.optflow.createOptFlow_DeepFlow()
+            # left_flow = inst.calc(left_prvs, left_img, None)
+            # right_flow = inst.calc(right_prvs, right_img, None)
         
 
-        # count = 0
-        prvs = nxt.copy()
+            # # calculate trajectories and analyse them
+            # angles, transl, lines = calculateOpticalFlow(frame_id, prvs_gray, flow)
+            left_angles, left_transl, left_lines = calculateOpticalFlow(frame_id, left_prvs, left_flow)
+            right_angles, right_transl, right_lines = calculateOpticalFlow(frame_id, right_prvs, right_flow)
 
+            # ang_mode, transl_mode, ratio, steady = estimate_turning(angles, transl)
+            left_ang_mode, left_transl_mode= estimate_turning(left_angles, left_transl)
+            right_ang_mode, right_transl_mode = estimate_turning(right_angles, right_transl)
 
-    # put values on the frame
-#     cv.putText(next_gray, angle, (50,100), font, fontScale, fontColor, lineType)
-#     cv.putText(next_gray, translation, (50,150), font, fontScale, fontColor, lineType)
+            leftAngle = str(np.round(left_ang_mode, 2))
+            rightAngle = str(np.round(right_ang_mode, 2))
+            cv.putText(left_img, leftAngle, (10,50), font, fontScale, fontColor, lineType)
+            cv.putText(right_img, rightAngle, (10,50), font, fontScale, fontColor, lineType)
+            left_line=[]
+            right_line=[]
+            for l in left_lines:
+                tempAngle = math.atan2(-l[1][1] + l[0][1], l[1][0] - l[0][0]) * 180.0 / np.pi
+                tempTransl = math.hypot(l[1][0] - l[0][0], l[1][1] + l[0][1])
+                if tempTransl > translThreshold and abs(abs(tempAngle) - 90) > angleThreshold:
+                    left_line.append(l)
+
+            for l in right_lines:
+                tempAngle = math.atan2(-l[1][1] + l[0][1], l[1][0] - l[0][0]) * 180.0 / np.pi
+                tempTransl = math.hypot(l[1][0] - l[0][0], l[1][1] + l[0][1])
+                if tempTransl > translThreshold and abs(abs(tempAngle) - 90) > angleThreshold:
+                    right_line.append(l)
         
-    next_gray = cv.cvtColor(next_gray.copy(), cv.COLOR_GRAY2BGR)
-    tempList = "None"
-    if(len(motion_list) >= 3):
-        if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
-            realMotion = motion_list[motion_index - 2]
-
-        tempList = str(motion_list[motion_index - 2]) + ", " + str(motion_list[motion_index - 1]) + ", " + str(motion_list[motion_index])
-
-    # if(len(motion_list) >= 2):
-    #     if(motion_list[motion_index - 1] == motion_list[motion_index]):
-    #         realMotion = motion_list[motion_index - 1]
-
-    #     tempList = str(motion_list[motion_index - 1]) + ", " + str(motion_list[motion_index])
-
-    cv.putText(next_gray, str(realMotion), (50,150), font, fontScale, fontColor, lineType)
-    
-    cv.putText(next_gray, tempList, (50,200), font, fontScale, fontColor, lineType)
 
 
-    # write the frame to the new video
-    outputStream.write(next_gray)
+            left_img = cv.polylines(left_img, left_line, 0, (0, 0, 255))
+            right_img = cv.polylines(right_img, right_line, 0, (0, 0, 255))
 
-    # # update the previous frame
-    # prvs = nxt.copy()
-    # count += 1
-    frame_id += 1
+            cv.imshow('left Image', left_img)
+            cv.imshow('Right Image', right_img)
+            # cv.imwrite(r'left\\left'+str(frame_id)+'.jpg', left_img)
+            # cv.imwrite(r'right\\right'+str(frame_id)+'.jpg', right_img)
+            if cv.waitKey(1) & 0xFF == ord('q'):
+                break
+            # draw trajectories on the frame
+    #         next_gray = draw_flow(next_gray.copy(), lines)
+            
+
+    #         angle = str(round(ang_mode, 2))
+    #         translation = str(round(transl_mode, 2))
+            # motion = 'No motion' if steady else round(ratio[0], 2)
+            # if isinstance(motion, float):
+            #     motion_type = 'Panning' if motion > 0.6 else 'Trucking'
+            motion = "No Motion"
+            if(float(leftAngle) == -1 or float(rightAngle) == -1):
+                motion = "No Motion"
+            elif(left_transl_mode > 0 and right_transl_mode > 0):
+                if (float(leftAngle) >= 90 and float(leftAngle) <= 180) or (float(leftAngle) <= -90 and float(leftAngle) >= -180):  #左邊往左
+                    if(float(rightAngle) >=0 and float(rightAngle) <= 90) or (float(rightAngle) >= -90 and float(rightAngle) <= 0): #右邊往右
+                        motion = "Straight"
+                        motion_list.append("Straight")
+                    elif(float(rightAngle) >= 90 and float(rightAngle) <= 180) or (float(rightAngle) <= -90 and float(rightAngle) >= -180): #右邊往左
+                        motion = "Right"
+                        motion_list.append("Right")
+                elif(float(leftAngle) >=0 and float(leftAngle) <= 90) or (float(leftAngle) >= -90 and float(leftAngle) <= 0):   #左邊往右
+                    if(float(rightAngle) >=0 and float(rightAngle) <= 90) or (float(rightAngle) >= -90 and float(rightAngle) <= 0): #右邊往右
+                        motion = "Left"
+                        motion_list.append("Left")
+                    elif(float(rightAngle) >= 90 and float(rightAngle) <= 180) or (float(rightAngle) <= -90 and float(rightAngle) >= -180): #右邊往左
+                        motion = "Back"
+                        motion_list.append("Back")
+                
+                motion_index += 1
+            else:
+                motion_list.append("No Motion")
+            
+
+            # count = 0
+            prvs = nxt.copy()
+
+
+        # put values on the frame
+    #     cv.putText(next_gray, angle, (50,100), font, fontScale, fontColor, lineType)
+    #     cv.putText(next_gray, translation, (50,150), font, fontScale, fontColor, lineType)
+            
+        next_gray = cv.cvtColor(next_gray.copy(), cv.COLOR_GRAY2BGR)
+        tempList = "None"
+        if(len(motion_list) >= 3):
+            if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
+                realMotion = motion_list[motion_index - 2]
+
+            tempList = str(motion_list[motion_index - 2]) + ", " + str(motion_list[motion_index - 1]) + ", " + str(motion_list[motion_index])
+
+        # if(len(motion_list) >= 2):
+        #     if(motion_list[motion_index - 1] == motion_list[motion_index]):
+        #         realMotion = motion_list[motion_index - 1]
+
+        #     tempList = str(motion_list[motion_index - 1]) + ", " + str(motion_list[motion_index])
+
+        cv.putText(next_gray, str(realMotion), (50,150), font, fontScale, fontColor, lineType)
+        
+        cv.putText(next_gray, tempList, (50,200), font, fontScale, fontColor, lineType)
+
+
+        # write the frame to the new video
+        outputStream.write(next_gray)
+
+        # # update the previous frame
+        # prvs = nxt.copy()
+        # count += 1
+        frame_id += 1
 
 
 
 
-outputStream.release()
-newVideo = cv.VideoCapture("motion_" + filename[:-4] + ".mp4")
-print("Old Frame count:", cap.get(cv.CAP_PROP_FRAME_COUNT))
-print("New frame count:", newVideo.get(cv.CAP_PROP_FRAME_COUNT))
-print("Old FPS:", cap.get(cv.CAP_PROP_FPS))
-print("New FPS:", newVideo.get(cv.CAP_PROP_FPS))
+    outputStream.release()
+    newVideo = cv.VideoCapture("motion_" + filename[:-4] + ".mp4")
+    print("Old Frame count:", cap.get(cv.CAP_PROP_FRAME_COUNT))
+    print("New frame count:", newVideo.get(cv.CAP_PROP_FRAME_COUNT))
+    print("Old FPS:", cap.get(cv.CAP_PROP_FPS))
+    print("New FPS:", newVideo.get(cv.CAP_PROP_FPS))
