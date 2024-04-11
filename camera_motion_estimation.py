@@ -19,7 +19,7 @@ from collections import Counter
 
 scene = "outside"
 
-# 輸入影像 輸出目前影像是往左還是右a
+# 輸入影像 輸出目前影像是往左還是右
 def yuv_estimate(img):
     translation = np.ravel(img)
     # nonzeros = np.where(translation != 128)
