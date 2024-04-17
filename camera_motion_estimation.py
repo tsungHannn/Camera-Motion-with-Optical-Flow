@@ -16,8 +16,14 @@ import matplotlib.pyplot as plt
 from scipy.stats import mode
 from sklearn.cluster import KMeans
 from collections import Counter
+from matplotlib import pyplot as plt
+from scipy.signal import find_peaks
 
 scene = "outside"
+window_number = 5
+threshold = 1000
+
+
 
 # 輸入影像 輸出目前影像是往左還是右
 def yuv_estimate(img):
@@ -26,19 +32,22 @@ def yuv_estimate(img):
     # translation = translation[nonzeros]
     left_index = np.where(translation > 128)
     right_index = np.where(translation < 128)
+
     left = translation[left_index]
     right = translation[right_index]
-    value = 0
+    # value = 0
     # if len(left_index[0]) < 5000 and len(right_index[0]) < 5000:
     #     return "stop"
     if scene == "outside":
         diff = len(left_index[0]) - len(right_index[0])
         # cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
-        if diff > 8000:
-            value = mode(left)[0][0]
+        if diff > threshold:
+            return int((np.sum(left)/left.size) - 128)
+            # value = mode(left)[0][0]
             return "left"
-        elif diff < -8000:
-            value = mode(right)[0][0]
+        elif diff < -1 * threshold:
+            return int((np.sum(right)/right.size) - 128)
+            # value = mode(right)[0][0]
             return "right"
         else:
             return "None"
@@ -50,10 +59,10 @@ def yuv_estimate(img):
         diff = len(left_index[0]) - len(right_index[0])
         cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
         if diff > 2000:
-            value = mode(left)[0][0]
+            # value = mode(left)[0][0]
             return "left"
         elif diff < -2000:
-            value = mode(right)[0][0]
+            # value = mode(right)[0][0]
             return "right"
         else:
             return "None"
@@ -67,158 +76,217 @@ def yuv_estimate(img):
 
 
 # specify directory and file name
-dir_path = "mvs_mp4"
+# dir_path = "mvs_mp4"
+dir_path = "/media/mvclab/HDD/mvs_mp4"  # mvclab
 
-all_file = os.listdir(dir_path)
+# all_file = os.listdir(dir_path)
 
-for file in all_file:
-    filename = file
-    # filename = "test_2024-03-18-08-00-56_mvs_compressed.mp4" # 戶外直線
-    # filename = "test_2024-03-18-07-59-24_mvs_compressed.mp4" # 戶外直線+右轉
-    # filename = "test_2024-03-18-07-57-26_mvs_compressed.mp4" # 最長的
-    # filename = "test_2024-03-18-08-05-15_mvs_compressed.mp4" # 室內
+# for file in all_file:
+# filename = file
+# filename = "/media/mvclab/HDD/mvs_mp4/test_2024-03-18-08-00-56_mvs_compressed.mp4" # mvclab 戶外直線
+# filename = "test_2024-03-18-08-00-56_mvs_compressed.mp4" # 戶外直線
+# filename = "test_2024-03-18-07-59-24_mvs_compressed.mp4" # 戶外直線+右轉
+filename = "test_2024-03-18-07-57-26_mvs_compressed.mp4" # 最長的
+# filename = "test_2024-03-18-08-05-15_mvs_compressed.mp4" # 室內
 
-    # filename = "T2_301_01.mp4"
+# filename = "T2_301_01.mp4"
 
-    # 儲存每幀
-    save_frame = False
-    save = "save"
+# 儲存每幀
+save_frame = False
+save = "save"
 
-    # initialise stream from video
-    cap = cv.VideoCapture(os.path.join(dir_path, filename))
+# initialise stream from video
+cap = cv.VideoCapture(os.path.join(dir_path, filename))
 
-    print(os.path.join(dir_path, filename))
-    print(cap.isOpened())
-    ret, prvs = cap.read()
+print(os.path.join(dir_path, filename))
+print(cap.isOpened())
+ret, prvs = cap.read()
 
-    # initialise video writer
-    frameRate = int(cap.get(cv.CAP_PROP_FPS))
-    codec = cv.VideoWriter_fourcc(*'mp4v')
-    save_name = "motion_" + filename[:-4] + ".mp4"
-    outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+# initialise video writer
+frameRate = int(cap.get(cv.CAP_PROP_FPS))
+codec = cv.VideoWriter_fourcc(*'mp4v')
+save_name = "motion_" + filename[:-4] + ".mp4"
+outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
 
-    # set parameters for text drawn on the frames
-    font = cv.FONT_HERSHEY_COMPLEX
-    fontScale = 1
-    fontColor = (68, 148, 213)
-    lineType  = 3
+# set parameters for text drawn on the frames
+font = cv.FONT_HERSHEY_COMPLEX
+fontScale = 1
+fontColor = (68, 148, 213)
+lineType  = 3
 
-    # initialise text variables to draw on frames
-    angle = 'None'
-    translation = 'None'
-    motion = 'None'
-    motion_type = 'None'
-    motion_list = []
-    motion_index = -1
-    realMotion = 'None'
-    # set counter value
-    # count = 1
+# initialise text variables to draw on frames
+angle = 'None'
+translation = 'None'
+motion = 'None'
+motion_type = 'None'
+motion_list = []
+motion_index = -1
+realMotion = 'None'
+# set counter value
+# count = 1
 
-    if scene == "outside":
-        frame_id = 0
-        frame_width = int(cap.get(3))
-        frame_height = int(cap.get(4))
-        left_width = frame_width // 3
-        right_wide = left_width * 2
-        left_top = frame_height // 10
-        left_height = frame_width // 2
-    elif scene == "inside":
-        frame_id = 0
-        frame_width = int(cap.get(3))
-        frame_height = int(cap.get(4))
-        left_width = frame_width // 3
-        right_wide = left_width * 2
-        left_top = frame_height // 10
-        left_height = frame_height // 5 * 4
+window_list = [] # 存每個window
+window_state = [] # 每個window的區域結果
+polygon_list = [] # 畫每個window的範圍
 
-    # main loop
-    while True:
-        # read a new frame
-        ret, nxt = cap.read()
-
-        if not ret:
-            break
-
-        yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
-
-        y, u, v = cv.split(yuv)
+if scene == "outside":
+    frame_id = 0
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    window_width = frame_width // window_number
+    window_bottom = frame_width // 2
+    window_top = frame_height // 10
 
 
+    left_width = frame_width // 3
+    right_wide = left_width * 2
+    
+elif scene == "inside":
+    frame_id = 0
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    left_width = frame_width // 3
+    right_wide = left_width * 2
+    window_top = frame_height // 10
+    window_bottom = frame_height // 5 * 4
 
-        left_img = v[left_top:left_height, :left_width]
-        right_img = v[left_top:left_height, right_wide:]
-        left_polygon_pts = [[0, left_top], [left_width - 1, left_top], [left_width - 1, left_height - 1], [0, left_height - 1]]
-        right_polygon_pts = [[right_wide, left_top], [frame_width - 1, left_top], [frame_width - 1, left_height - 1], [right_wide, left_height - 1]]
-        left_polygon_pts = np.array([left_polygon_pts], dtype=np.int32)
-        right_polygon_pts = np.array([right_polygon_pts], dtype=np.int32)
-        yuv_with_polygons = cv.polylines(nxt.copy(), [left_polygon_pts, right_polygon_pts], isClosed=True, color=(0, 255, 0), thickness=2)
+noiseList = []
+# main loop
+while True:
+    # read a new frame
+    ret, nxt = cap.read()
 
-        # if frame_id % 3 == 0:
+    if not ret:
+        break
 
-        left_state = str(yuv_estimate(left_img))
-        right_state = str(yuv_estimate(right_img))
+    yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
-        if left_state == "None" or right_state == "None":
-            pass
-        else:
-            
-            if(left_state == "left") and (right_state == "right"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Straight")
-            elif(left_state == "left") and (right_state == "left"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Right")
-            elif(left_state == "right") and (right_state == "right"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Left")
-            elif(left_state == "stop") and (right_state == "stop"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Stop")
-            else:
-                pass # stop and right
+    y, u, v = cv.split(yuv)
 
-            if(len(motion_list) >= 3):
-                if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
-                    realMotion = motion_list[motion_index - 2]
+    window_list.clear()
+    polygon_list.clear()
+    window_state.clear()
+    for i in range(window_number):
+        window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+        polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
+        polygon = np.array([polygon], dtype=np.int32)
+        polygon_list.append(polygon)
 
-        cv.putText(yuv_with_polygons, left_state, (50,100), font, fontScale, fontColor, lineType)
-        cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
-        # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
-        cv.putText(yuv_with_polygons, str(realMotion), (50,150), font, fontScale, (0, 0, 255), lineType)
+
+    
+
+    # left_img = v[window_top:window_bottom, :left_width]
+    # right_img = v[window_top:window_bottom, right_wide:]
+    # left_polygon_pts = [[0, window_top], [left_width - 1, window_top], [left_width - 1, window_bottom - 1], [0, window_bottom - 1]]
+    # right_polygon_pts = [[right_wide, window_top], [frame_width - 1, window_top], [frame_width - 1, window_bottom - 1], [right_wide, window_bottom - 1]]
+    # left_polygon_pts = np.array([left_polygon_pts], dtype=np.int32)
+    # right_polygon_pts = np.array([right_polygon_pts], dtype=np.int32)
+    yuv_with_polygons = cv.polylines(nxt.copy(), polygon_list, isClosed=True, color=(0, 255, 0), thickness=2)
+
+    # if frame_id % 3 == 0:
+
+    # 用垂直向量檢測雜點（未完成）
+    # ===============================================================
+    # vertical = np.ravel(u)
+    # up = np.where(vertical > 130)
+    # down = np.where(vertical < 126)
+    # ver_s = up[0].size + down[0].size
+
+
+    # # up = np.where(u > 128)
+    # # down = np.where(u < 128)
+    # # ver_s = np.sum(u[up]) + np.sum(u[down])
+    # # ver_s /= (up[0].size + down[0].size)
+
+    # # horizontal = np.ravel(v)
+    # # right = np.where(horizontal > 130)
+    # # left = np.where(horizontal < 126)
+    # # hor_s = right[0].size + left[0].size
+
+    # # peaks = find_peaks(ver_s)
+    # noiseList.append(ver_s)
+    # peaks, _ = find_peaks(noiseList, prominence=25000)
+
+    # # plotPeak = np.array(noiseList)[peaks]
+    # plt.clf()
+    # plt.plot(noiseList)
+    # plt.plot(peaks, np.array(noiseList)[peaks], "x")
+
+    # plt.pause(0.00001)
+    # plt.ioff()
+    # ===============================================================
+
+    # 儲存每個window的區域結果
+    for i in range(window_number):
+        window_state.append(yuv_estimate(window_list[i]))
+
+    # left_state = str(yuv_estimate(left_img))
+    # right_state = str(yuv_estimate(right_img))
+
+    # if left_state == "None" or right_state == "None":
+    #     pass
+    # else:
         
-        y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
-        u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
-        v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
-        # cv.imshow("Original", nxt)
-        # cv.imshow("yuv", yuv)
-        # cv.imshow('YImage', y)
-        # cv.imshow('UImage', u)
-        # cv.imshow('VImage', v)
-        cv.imshow("left", left_img)
-        cv.imshow("right", right_img)
-        cv.imshow("polygons", yuv_with_polygons)
+    #     if(left_state == "left") and (right_state == "right"):
+    #         if len(motion_list) >= 3:
+    #             motion_list.pop(0)
+    #         motion_list.append("Straight")
+    #     elif(left_state == "left") and (right_state == "left"):
+    #         if len(motion_list) >= 3:
+    #             motion_list.pop(0)
+    #         motion_list.append("Right")
+    #     elif(left_state == "right") and (right_state == "right"):
+    #         if len(motion_list) >= 3:
+    #             motion_list.pop(0)
+    #         motion_list.append("Left")
+    #     elif(left_state == "stop") and (right_state == "stop"):
+    #         if len(motion_list) >= 3:
+    #             motion_list.pop(0)
+    #         motion_list.append("Stop")
+    #     else:
+    #         pass # stop and right
 
-        if save_frame:
-            cv.imwrite(save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
+    #     if(len(motion_list) >= 3):
+    #         if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
+    #             realMotion = motion_list[motion_index - 2]
 
-        # if cv.waitKey(25) & 0xFF == ord('q'):
-        #     break
-        
-        outputStream.write(yuv_with_polygons)
-        
+    # 畫上每個區域結果
+    for i in range(window_number):
+        cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), font, fontScale, fontColor, lineType)
+    # cv.putText(yuv_with_polygons, left_state, (50,100), font, fontScale, fontColor, lineType)
+    # cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
+    # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
+    # cv.putText(yuv_with_polygons, str(realMotion), (260,40), font, fontScale, (0, 0, 255), lineType)
+    
+    y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
+    u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
+    v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
+    # cv.imshow("Original", nxt)
+    # cv.imshow("yuv", yuv)
+    # cv.imshow('YImage', y)
+    cv.imshow('UImage', u)
+    cv.imshow('VImage', v)
+    # cv.imshow("left", left_img)
+    # cv.imshow("right", right_img)
+    cv.imshow("polygons", yuv_with_polygons)
 
-        frame_id += 1
+    if save_frame:
+        cv.imwrite(save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
+
+    if cv.waitKey(25) & 0xFF == ord('q'):
+        break
+    
+    outputStream.write(yuv_with_polygons)
+    
+
+    frame_id += 1
 
 
 
 
-    outputStream.release()
-    newVideo = cv.VideoCapture("motion_" + filename[:-4] + ".mp4")
-    print("Old Frame count:", cap.get(cv.CAP_PROP_FRAME_COUNT))
-    print("New frame count:", newVideo.get(cv.CAP_PROP_FRAME_COUNT))
-    print("Old FPS:", cap.get(cv.CAP_PROP_FPS))
-    print("New FPS:", newVideo.get(cv.CAP_PROP_FPS))
+outputStream.release()
+newVideo = cv.VideoCapture("motion_" + filename[:-4] + ".mp4")
+print("Old Frame count:", cap.get(cv.CAP_PROP_FRAME_COUNT))
+print("New frame count:", newVideo.get(cv.CAP_PROP_FRAME_COUNT))
+print("Old FPS:", cap.get(cv.CAP_PROP_FPS))
+print("New FPS:", newVideo.get(cv.CAP_PROP_FPS))
