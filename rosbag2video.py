@@ -207,12 +207,12 @@ class RosVideoWriter():
         for topic, msg, t in bag.read_messages(connection_filter=self.filter_image_msgs, start_time=self.opt_start, end_time=self.opt_end):
             try:
                 #msg.format='jpeg,bgr8'
-                print(topic, msg.format)
+                # print(topic, msg.format)
                 if msg.format.find("jpeg")!=-1 :
                     if msg.format.find("8UC3")!=-1 and msg.format.find("compressed")!=-1:
                         cv_image = bridge.compressed_imgmsg_to_cv2(msg)
                         self.write_output_video( msg, topic, t, MJPEG_VIDEO )
-                        print('*'*10)
+                        # print('*'*10)
                     elif msg.format.find("8")!=-1 and (msg.format.find("rgb")!=-1 or msg.format.find("bgr")!=-1 or msg.format.find("bgra")!=-1 ):
                         if self.opt_display_images:
                             np_arr = np.fromstring(msg.data, np.uint8)
@@ -311,12 +311,26 @@ if __name__ == '__main__':
         except getopt.GetoptError:
             print_help()
             sys.exit(2)
-
+    
+    
 
     # loop over all files
     for files in range(0,len(opt_files)):
+        # newWriter = RosVideoWriter()
         #First arg is the bag to look at
-        bagfile = opt_files[files]
-        videowriter.addBag(bagfile)
+
+        if(os.path.isdir(opt_files[files])):
+            print("Find Folder")
+            allFile = os.listdir(opt_files[files])
+            for f in allFile:
+                newWriter = RosVideoWriter()
+                fullpath = os.path.join(opt_files[files], f)
+                print("Full path:", fullpath)
+                bagfile = fullpath
+                newWriter.addBag(bagfile)
+                print("Write File:", newWriter.opt_out_file)
+        else:
+            bagfile = opt_files[files]
+            videowriter.addBag(bagfile)
     print("finished")
 
