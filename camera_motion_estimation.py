@@ -25,16 +25,19 @@ from scipy.signal import find_peaks
 # 用手機架把MV架在後照鏡上，平均約0.3
 
 scene = "outside"
-window_number = 3
-threshold = 8000
+window_number = 5
+threshold = 2000
 
 # specify directory and file name
-# dir_path = "mvs_mp4"
-dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
+dir_path = "mvs_mp4\\0318"
+# dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
 
 # all_file = os.listdir(dir_path)
 # all_file = [os.path.join(dir_path, "0419_2024-04-19-06-08-40_mvs_compressed.mp4")]
-all_file = [os.path.join(dir_path, "test_2024-03-18-07-59-24_mvs_compressed.mp4")]
+all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"]
+# all_file = ["0419_2024-04-19-06-08-40_mvs_compressed.mp4"]
+# all_file = ["test_2024-03-18-08-00-02_mvs_compressed.mp4"] # 戶外直線+右轉(畫數據圖的)
+# all_file = [os.path.join(dir_path, "test_2024-03-18-07-59-24_mvs_compressed.mp4")]
 
 
 # filename = "/media/mvclab/HDD/mvs_mp4/test_2024-03-18-08-00-56_mvs_compressed.mp4" # mvclab 戶外直線
@@ -62,11 +65,11 @@ def yuv_estimate(img):
         diff = len(left_index[0]) - len(right_index[0])
         # cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
         if diff > threshold:
-            # return int((np.sum(left)/left.size) - 128)
+            return int((np.sum(left)/left.size) - 128)
             # value = mode(left)[0][0]
             return "left"
         elif diff < -1 * threshold:
-            # return int((np.sum(right)/right.size) - 128)
+            return int((np.sum(right)/right.size) - 128)
             # value = mode(right)[0][0]
             return "right"
         else:
@@ -92,8 +95,26 @@ def yuv_estimate(img):
         #     value = mode(right)[0][0]
 
 
+# 把MV得到的X,Y軸向量加起來，得到每個pixel的大小跟角度
+def getVanishingPoint(u, v):
+    magnitude = np.sqrt(u**2 + v**2)
+    angle = np.arctan2(u, v)
+
+    # 將角度轉換為 0 到 360 的範圍
+    angle = ((angle + np.pi) * 180 / np.pi) % 360
+    # 繪製合併的位移向量場
+    u = u.astype("int16")
+    u = u - 128
+    v = v.astype("int16")
+    v = v - 128
 
 
+    plt.quiver(u, v, color="red", scale=0.01)  # scale 控制箭頭的大小
+    plt.title('Combined Displacement Vector Field')
+    plt.xlabel('X-axis')
+    plt.ylabel('Y-axis')
+    plt.show()
+    pass
 
 
 
@@ -107,6 +128,7 @@ for file in all_file:
 
     # initialise stream from video
     cap = cv.VideoCapture(os.path.join(dir_path, filename))
+    # cap = cv.VideoCapture(filename)
 
     print(os.path.join(dir_path, filename))
     print(cap.isOpened())
@@ -116,7 +138,7 @@ for file in all_file:
     frameRate = int(cap.get(cv.CAP_PROP_FPS))
     codec = cv.VideoWriter_fourcc(*'mp4v')
     save_name = "motion_" + filename[:-4] + ".mp4"
-    # outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+    outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
 
     # set parameters for text drawn on the frames
     font = cv.FONT_HERSHEY_COMPLEX
@@ -144,9 +166,11 @@ for file in all_file:
         frame_width = int(cap.get(3))
         frame_height = int(cap.get(4))
         window_width = frame_width // window_number
-        window_bottom = frame_width // 2
-        window_top = frame_height // 10
 
+        # window_bottom = frame_width // 2
+        # window_top = frame_height // 10
+        window_bottom = frame_height // 7*6
+        window_top = frame_height // 7
 
         left_width = frame_width // 3
         right_wide = left_width * 2
@@ -163,6 +187,14 @@ for file in all_file:
     noiseList1 = []
     noiseList2 = []
     averageList = []
+    last_left = ""
+    last_right = ""
+    last_state = []
+    for i in range(window_number):
+        last_state.append("")
+    record = []
+    for i in range(window_number):
+        record.append([])
     # main loop
     while True:
         # read a new frame
@@ -175,110 +207,142 @@ for file in all_file:
 
         y, u, v = cv.split(yuv)
 
+
+        getVanishingPoint(u.copy(), v.copy())
+
         window_list.clear()
         polygon_list.clear()
         window_state.clear()
-        # for i in range(window_number):
-        #     window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
-        #     polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
-        #     polygon = np.array([polygon], dtype=np.int32)
-        #     polygon_list.append(polygon)
+        for i in range(window_number):
+            window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+            polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
+            polygon = np.array([polygon], dtype=np.int32)
+            polygon_list.append(polygon)
 
 
         
 
         left_img = v[window_top:window_bottom, :left_width]
         right_img = v[window_top:window_bottom, right_wide:]
-        left_polygon_pts = [[0, window_top], [left_width - 1, window_top], [left_width - 1, window_bottom - 1], [0, window_bottom - 1]]
-        right_polygon_pts = [[right_wide, window_top], [frame_width - 1, window_top], [frame_width - 1, window_bottom - 1], [right_wide, window_bottom - 1]]
-        left_polygon_pts = np.array([left_polygon_pts], dtype=np.int32)
-        right_polygon_pts = np.array([right_polygon_pts], dtype=np.int32)
+        # left_polygon_pts = [[0, window_top], [left_width - 1, window_top], [left_width - 1, window_bottom - 1], [0, window_bottom - 1]]
+        # right_polygon_pts = [[right_wide, window_top], [frame_width - 1, window_top], [frame_width - 1, window_bottom - 1], [right_wide, window_bottom - 1]]
+        # left_polygon_pts = np.array([left_polygon_pts], dtype=np.int32)
+        # right_polygon_pts = np.array([right_polygon_pts], dtype=np.int32)
         yuv_with_polygons = cv.polylines(nxt.copy(), polygon_list, isClosed=True, color=(0, 255, 0), thickness=2)
+        # yuv_with_polygons = cv.polylines(nxt.copy(), left_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
+        # yuv_with_polygons = cv.polylines(yuv_with_polygons, right_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
 
         # if frame_id % 3 == 0:
 
         # 用垂直向量檢測雜點（未完成）
         # ===============================================================
-        # vertical = np.ravel(u)
-        # up = np.where(vertical > 130)
-        # down = np.where(vertical < 126)
-        # ver_s = (up[0].size + down[0].size) / vertical.size
+        # # vertical = np.ravel(u)
+        # # up = np.where(vertical > 130)
+        # # down = np.where(vertical < 126)
+        # # ver_s = (up[0].size + down[0].size) / vertical.size
 
 
-        # up = np.where(u > 128)
-        # down = np.where(u < 128)
-        # ver_s = np.sum(u[up]) + np.sum(u[down])
-        # ver_s /= (up[0].size + down[0].size)
+        # # up = np.where(u > 128)
+        # # down = np.where(u < 128)
+        # # ver_s = np.sum(u[up]) + np.sum(u[down])
+        # # ver_s /= (up[0].size + down[0].size)
         
-        left_horizontal = np.ravel(left_img)
-        # right_horizontal = np.ravel(right_img)
+        # left_horizontal = np.ravel(left_img)
+        # # right_horizontal = np.ravel(right_img)
 
-        right1 = np.where(left_horizontal > 128)
-        left1 = np.where(left_horizontal < 128)
-        hor_s1 = abs(right1[0].size - left1[0].size) / (right1[0].size + left1[0].size)
+        # right1 = np.where(left_horizontal > 128)
+        # left1 = np.where(left_horizontal < 128)
+        # hor_s1 = abs(right1[0].size - left1[0].size) / (right1[0].size + left1[0].size)
 
-        # right2 = np.where(right_horizontal > 128)
-        # left2 = np.where(right_horizontal < 128)
-        # hor_s2 = abs(right2[0].size - left2[0].size) / (right2[0].size + left2[0].size)
+        # # right2 = np.where(right_horizontal > 128)
+        # # left2 = np.where(right_horizontal < 128)
+        # # hor_s2 = abs(right2[0].size - left2[0].size) / (right2[0].size + left2[0].size)
 
-        # peaks = find_peaks(ver_s)
-        noiseList1.append(hor_s1)
-        average = np.average(noiseList1)
-        averageList.append(average)
-        # noiseList2.append(hor_s2)
-        # peaks, _ = find_peaks(noiseList, prominence=25000)
+        # # peaks = find_peaks(ver_s)
+        # noiseList1.append(hor_s1)
+        # average = np.average(noiseList1)
+        # averageList.append(average)
+        # # noiseList2.append(hor_s2)
+        # # peaks, _ = find_peaks(noiseList, prominence=25000)
 
-        # plotPeak = np.array(noiseList)[peaks]
-        plt.clf()
-        plt.plot(noiseList1, label="left")
-        plt.plot(averageList, label="average")
-        plt.legend()
-        # plt.plot(peaks, np.array(noiseList)[peaks], "x")
-        plt.pause(0.00001)
-        plt.ioff()
+        # # plotPeak = np.array(noiseList)[peaks]
+        # plt.clf()
+        # # plt.plot(noiseList1, label="left")
+        # # plt.plot(averageList, label="average")
+        # # plt.legend()
+        # # plt.plot(peaks, np.array(noiseList)[peaks], "x")
+        # plt.plot(record[0])
+        # plt.plot(record[4])
+        # plt.pause(0.00001)
+        # plt.ioff()
         
         # ===============================================================
 
-        # # 儲存每個window的區域結果
-        # for i in range(window_number):
-        #     window_state.append(yuv_estimate(window_list[i]))
-
-        left_state = str(yuv_estimate(left_img))
-        right_state = str(yuv_estimate(right_img))
-
-        if left_state == "None" or right_state == "None":
-            pass
-        else:
+        # 儲存每個window的區域結果
+        for i in range(window_number):
+            tempAns = yuv_estimate(window_list[i])
+            if(tempAns == "None" and last_state != ""):
+                window_state.append(last_state[i])
+            if(tempAns != "None"):
+                last_state[i] = tempAns
+                window_state.append(tempAns)
             
-            if(left_state == "left") and (right_state == "right"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Straight")
-            elif(left_state == "left") and (right_state == "left"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Right")
-            elif(left_state == "right") and (right_state == "right"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Left")
-            elif(left_state == "stop") and (right_state == "stop"):
-                if len(motion_list) >= 3:
-                    motion_list.pop(0)
-                motion_list.append("Stop")
+            
+
+
+        # left_state = str(yuv_estimate(left_img))
+        # right_state = str(yuv_estimate(right_img))
+
+        # if(last_left != ""):
+        #     if(left_state == 'None'):
+        #         left_state = last_left
+        # if(last_right != ""):
+        #     if(right_state == "None"):
+        #         right_state = last_right
+
+        # if(left_state != "None"):
+        #     last_left = left_state
+        # if(right_state != "None"):
+        #     last_right = right_state
+
+
+        # # if left_state == "None" or right_state == "None":
+        # #     pass
+        # # else:
+            
+        # if(left_state == "left") and (right_state == "right"):
+        #     if len(motion_list) >= 3:
+        #         motion_list.pop(0)
+        #     motion_list.append("Straight")
+        # elif(left_state == "left") and (right_state == "left"):
+        #     if len(motion_list) >= 3:
+        #         motion_list.pop(0)
+        #     motion_list.append("Right")
+        # elif(left_state == "right") and (right_state == "right"):
+        #     if len(motion_list) >= 3:
+        #         motion_list.pop(0)
+        #     motion_list.append("Left")
+        # elif(left_state == "stop") and (right_state == "stop"):
+        #     if len(motion_list) >= 3:
+        #         motion_list.pop(0)
+        #     motion_list.append("Stop")
+        # else:
+        #     pass # stop and right
+
+        # if(len(motion_list) >= 3):
+        #     if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
+        #         realMotion = motion_list[motion_index - 2]
+
+        # 畫上每個區域結果
+        for i in range(window_number):
+            cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), font, fontScale, fontColor, lineType)
+            if(window_state[i] == ""):
+                record[i].append(0)
             else:
-                pass # stop and right
-
-            if(len(motion_list) >= 3):
-                if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
-                    realMotion = motion_list[motion_index - 2]
-
-        # # 畫上每個區域結果
-        # for i in range(window_number):
-        #     cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), font, fontScale, fontColor, lineType)
-        cv.putText(yuv_with_polygons, left_state, (50,100), font, fontScale, fontColor, lineType)
-        cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
-        cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
+                record[i].append(int(window_state[i]))
+        # cv.putText(yuv_with_polygons, left_state, (50,100), font, fontScale, fontColor, lineType)
+        # cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
+        # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
         cv.putText(yuv_with_polygons, str(realMotion), (260,40), font, fontScale, (0, 0, 255), lineType)
         
         y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
@@ -296,20 +360,21 @@ for file in all_file:
         if save_frame:
             cv.imwrite(save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-        if cv.waitKey(25) & 0xFF == ord('q'):
-            break
+        # if cv.waitKey(25) & 0xFF == ord('q'):
+        #     break
         
-        # outputStream.write(yuv_with_polygons)
+        outputStream.write(yuv_with_polygons)
         
 
         frame_id += 1
 
 
+    # plt.plot(noiseList1, label="left")
+    # plt.plot(averageList, label="average")
+    # record = np.array(record)
+    plt.plot(record[1])
+    plt.plot(record[3])
+    plt.savefig("plot.png")
+    plt.show()
 
-
-    # outputStream.release()
-    # newVideo = cv.VideoCapture("motion_" + filename[:-4] + ".mp4")
-    # print("Old Frame count:", cap.get(cv.CAP_PROP_FRAME_COUNT))
-    # print("New frame count:", newVideo.get(cv.CAP_PROP_FRAME_COUNT))
-    # print("Old FPS:", cap.get(cv.CAP_PROP_FPS))
-    # print("New FPS:", newVideo.get(cv.CAP_PROP_FPS))
+    outputStream.release()
