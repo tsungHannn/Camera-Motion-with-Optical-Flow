@@ -1,39 +1,9 @@
-import numpy as np
-import matplotlib.pyplot as plt
+def exponential_moving_average(arr, alpha=0.5):
+    ema = arr[0]  # åˆå§‹ EMA è¨­ç‚ºç¬¬ä¸€å€‹å…ƒç´ 
+    for i in range(1, len(arr)):
+        ema = alpha * arr[i] + (1 - alpha) * ema
+    return ema
 
-
-X = np.arange(1, 6, 1)
-Y = np.arange(6, 1, -1)
-u, v = np.meshgrid(X, Y)
-
-magnitude = np.sqrt(u**2 + v**2)
-angle = np.arctan2(u, v)
-
-# ±N¨¤«×Âà´«¬° 0 ¨ì 360 ªº½d³ò
-angl_degree = (angle* 180 / np.pi)
-
-polar = np.zeros((len(u), len(v), 2))
-
-# Àx¦s magnitude ©M angl_degree ¨ì polar ¤¤
-polar[:,:,0] = magnitude
-polar[:,:,1] = angl_degree
-# Ã¸»s¦X¨Öªº¦ì²¾¦V¶q³õ
-u = u.astype("int16")
-u = u - 128
-v = v.astype("int16")
-v = v - 128
-
-print(polar)
-plt.quiver(u, v, color="red")  # scale ±±¨î½bÀYªº¤j¤p
-plt.title('Combined Displacement Vector Field')
-plt.xlabel('X-axis')
-plt.ylabel('Y-axis')
-plt.show()
-
-
-
-# C = np.sin(U)
-
-# fig, ax = plt.subplots()
-# q = ax.quiver(X, Y, U, V, C)
-# plt.show()
+# æ¸¬è©¦
+arr = [10, 12, 14, 16, 18]
+print("Exponential Moving Average:", exponential_moving_average(arr))
