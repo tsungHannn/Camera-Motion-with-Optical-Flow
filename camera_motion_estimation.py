@@ -15,7 +15,7 @@ import yaml
 class MV_on_Vechicle:
     def __init__(self):
         with open("mvs.yaml", "r") as file:
-            mvs_data = yaml.load(file)
+            mvs_data = yaml.load(file, Loader=yaml.FullLoader)
             self.cameraMatrix = np.array(mvs_data['camera_matrix']['data'])
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
@@ -25,8 +25,8 @@ class MV_on_Vechicle:
         self.threshold = 8000
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0318"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
+        self.dir_path = "mvs_mp4\\0318"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
 
 		# all_file = os.listdir(dir_path)
 		# all_file = [os.path.join(dir_path, "0419_2024-04-19-06-08-40_mvs_compressed.mp4")]
@@ -443,6 +443,8 @@ class MV_on_Vechicle:
                         motion_list.append("Leaning left")
                     elif center_avg > self.leaning_right:
                         motion_list.append("Leaning right")
+                else:
+                    self.center_list.append(0) # 為了畫圖合理
 
 
                 if(len(motion_list) >= 3):
@@ -473,8 +475,8 @@ class MV_on_Vechicle:
                 if self.save_frame:
                     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-                if cv.waitKey(25) & 0xFF == ord('q'):
-                    break
+                # if cv.waitKey(25) & 0xFF == ord('q'):
+                #     break
                 
                 outputStream.write(yuv_with_polygons)
                 
