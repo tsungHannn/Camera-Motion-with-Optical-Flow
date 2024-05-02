@@ -11,6 +11,14 @@ from matplotlib import pyplot as plt
 from scipy.signal import savgol_filter
 import pandas as pd
 import yaml
+"""
+MVS 資料格式：
+輸出為640*480 YUV422，其中
+Y: 灰階影像 or Edge(640*480)
+U: 水平向量(320*480)  U > 128:向左   U < 128:向右
+V: 垂直向量(320*480)  V > 128:向上   V < 128:向下
+
+"""
 
 class MV_on_Vechicle:
     def __init__(self):
@@ -21,7 +29,7 @@ class MV_on_Vechicle:
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
         self.scene = "outside"
-        self.window_number = 40
+        self.window_number = 3
         self.threshold = 8000
 
 		# specify directory and file name
@@ -68,7 +76,7 @@ class MV_on_Vechicle:
 
     # 輸入影像 輸出目前影像是往左還是右
     def yuv_estimate(self, img):
-        self.threshold = img.shape[0]*img.shape[1]//3
+        self.threshold = img.shape[0]*img.shape[1]//4
         # print("threshold:", self.threshold)
         
         translation = np.ravel(img)
@@ -87,13 +95,13 @@ class MV_on_Vechicle:
             diff = len(left_index[0]) - len(right_index[0])
             # cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
             if diff > self.threshold:
-                # return int((np.sum(left)/left.size) - 128)
-                return 1
+                return int((np.sum(left)/left.size) - 128)
+                # return 1
                 # value = mode(left)[0][0]
                 return "left"
             elif diff < -1 * self.threshold:
-                # return int((np.sum(right)/right.size) - 128)
-                return -1
+                return int((np.sum(right)/right.size) - 128)
+                # return -1
                 # value = mode(right)[0][0]
                 return "right"
             else:
@@ -174,7 +182,7 @@ class MV_on_Vechicle:
         return ema
 
 
-    def run(self):
+    def run_split_window(self):
         for file in self.all_file:
             filename = file
 
@@ -257,7 +265,7 @@ class MV_on_Vechicle:
 
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
-                y, u, v = cv.split(yuv)
+                y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
 
 
                 # getVanishingPoint(u.copy(), v.copy())
@@ -297,52 +305,6 @@ class MV_on_Vechicle:
                 # yuv_with_polygons = cv.polylines(nxt.copy(), left_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
                 # yuv_with_polygons = cv.polylines(yuv_with_polygons, right_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
 
-                # if frame_id % 3 == 0:
-
-                # 用垂直向量檢測雜點（未完成）
-                # ===============================================================
-                # vertical = np.ravel(u)
-                # up = np.where(vertical > 130)
-                # down = np.where(vertical < 126)
-                # ver_s = (up[0].size + down[0].size) / vertical.size
-
-
-                # up = np.where(u > 128)
-                # down = np.where(u < 128)
-                # ver_s = np.sum(u[up]) + np.sum(u[down])
-                # ver_s /= (up[0].size + down[0].size)
-                
-                # left_horizontal = np.ravel(left_img)
-                # # right_horizontal = np.ravel(right_img)
-
-                # right1 = np.where(left_horizontal > 128)
-                # left1 = np.where(left_horizontal < 128)
-                # hor_s1 = abs(right1[0].size - left1[0].size) / (right1[0].size + left1[0].size)
-
-                # right2 = np.where(right_horizontal > 128)
-                # left2 = np.where(right_horizontal < 128)
-                # hor_s2 = abs(right2[0].size - left2[0].size) / (right2[0].size + left2[0].size)
-
-                # peaks = find_peaks(ver_s)
-                # noiseList1.append(hor_s1)
-                # average = np.average(noiseList1)
-                # averageList.append(average)
-                # noiseList2.append(hor_s2)
-                # peaks, _ = find_peaks(noiseList, prominence=25000)
-
-                # plotPeak = np.array(noiseList)[peaks]
-                # plt.clf()
-                # plt.plot(noiseList1, label="left")
-                # plt.plot(averageList, label="average")
-                # plt.legend()
-                # plt.plot(peaks, np.array(noiseList)[peaks], "x")
-                # plt.plot(record[0])
-                # plt.plot(record[4])
-                # plt.pause(0.00001)
-                # plt.ioff()
-                
-                # ===============================================================
-
                 # 儲存每個window的區域結果
                 for i in range(self.window_number):
                     tempAns = self.yuv_estimate(self.window_list[i])
@@ -352,52 +314,6 @@ class MV_on_Vechicle:
                         self.last_state[i] = tempAns
                         self.window_state.append(tempAns)
                 
-                
-
-
-
-                # left_state = str(yuv_estimate(left_img))
-                # right_state = str(yuv_estimate(right_img))
-
-                # if(last_left != ""):
-                #     if(left_state == 'None'):
-                #         left_state = last_left
-                # if(last_right != ""):
-                #     if(right_state == "None"):
-                #         right_state = last_right
-
-                # if(left_state != "None"):
-                #     last_left = left_state
-                # if(right_state != "None"):
-                #     last_right = right_state
-
-
-                # # if left_state == "None" or right_state == "None":
-                # #     pass
-                # # else:
-                    
-                # if(left_state == "left") and (right_state == "right"):
-                #     if len(motion_list) >= 3:
-                #         motion_list.pop(0)
-                #     motion_list.append("Straight")
-                # elif(left_state == "left") and (right_state == "left"):
-                #     if len(motion_list) >= 3:
-                #         motion_list.pop(0)
-                #     motion_list.append("Right")
-                # elif(left_state == "right") and (right_state == "right"):
-                #     if len(motion_list) >= 3:
-                #         motion_list.pop(0)
-                #     motion_list.append("Left")
-                # elif(left_state == "stop") and (right_state == "stop"):
-                #     if len(motion_list) >= 3:
-                #         motion_list.pop(0)
-                #     motion_list.append("Stop")
-                # else:
-                #     pass # stop and right
-
-                # if(len(motion_list) >= 3):
-                #     if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
-                #         realMotion = motion_list[motion_index - 2]
 
                 # 畫上每個區域結果
                 tempRow = []
@@ -465,9 +381,9 @@ class MV_on_Vechicle:
                 v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
                 # cv.imshow("Original", nxt)
                 # cv.imshow("yuv", yuv)
-                # cv.imshow('YImage', y)
-                # cv.imshow('UImage', u)
-                # cv.imshow('VImage', v)
+                cv.imshow('YImage', y)
+                cv.imshow('UImage', u)
+                cv.imshow('VImage', v)
                 # cv.imshow("left", left_img)
                 # cv.imshow("right", right_img)
                 cv.imshow("polygons", yuv_with_polygons)
@@ -475,8 +391,8 @@ class MV_on_Vechicle:
                 if self.save_frame:
                     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-                # if cv.waitKey(25) & 0xFF == ord('q'):
-                #     break
+                if cv.waitKey(25) & 0xFF == ord('q'):
+                    break
                 
                 outputStream.write(yuv_with_polygons)
                 
@@ -503,8 +419,287 @@ class MV_on_Vechicle:
             plt.show()
 
             outputStream.release()
+    
+    def run_two_window(self):
+        for file in self.all_file:
+            filename = file
+
+
+            # initialise stream from video
+            cap = cv.VideoCapture(os.path.join(self.dir_path, filename))
+            # cap = cv.VideoCapture(filename)
+
+            print(os.path.join(self.dir_path, filename))
+            print(cap.isOpened())
+            ret, prvs = cap.read()
+
+            # initialise video writer
+            frameRate = int(cap.get(cv.CAP_PROP_FPS))
+            codec = cv.VideoWriter_fourcc(*'mp4v')
+            save_name = "motion_" + filename[:-4] + ".mp4"
+            outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+
+
+
+            # initialise text variables to draw on frames
+            angle = 'None'
+            translation = 'None'
+            motion = 'None'
+            motion_type = 'None'
+            motion_list = []
+            motion_index = -1
+            realMotion = 'None'
+            left_state_list = []
+            right_state_list = []
+            # set counter value
+            # count = 1
+
+
+
+            if self.scene == "outside":
+                frame_id = 0
+                frame_width = int(cap.get(3))
+                frame_height = int(cap.get(4))
+                window_width = frame_width // self.window_number
+
+                window_bottom = frame_height // 4 * 3
+                window_top = frame_height // 8
+                # window_bottom = frame_height // 7*6
+                # window_top = frame_height // 7
+
+                left_width = frame_width // 3
+                right_wide = left_width * 2
+                
+            elif self.scene == "inside":
+                frame_id = 0
+                frame_width = int(cap.get(3))
+                frame_height = int(cap.get(4))
+                left_width = frame_width // 3
+                right_wide = left_width * 2
+                window_top = frame_height // 10
+                window_bottom = frame_height // 5 * 4
+
+            noiseList1 = []
+            noiseList2 = []
+            averageList = []
+            last_left = ""
+            last_right = ""
+
+
+            for i in range(self.window_number):
+                self.last_state.append("")
+            
+            for i in range(self.window_number):
+                self.window_result.append([])
+            # main loop
+            while True:
+                # read a new frame
+                ret, nxt = cap.read()
+
+                if not ret:
+                    break
+                
+                cv.imshow("before", nxt)
+                nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
+                # cv.imshow("after", nxt)
+
+                yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
+
+                y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
+
+
+                # getVanishingPoint(u.copy(), v.copy())
+
+                self.window_list.clear()
+                self.polygon_list.clear()
+                self.window_state.clear()
+                for i in range(self.window_number):
+                    self.window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
+                    polygon = np.array([polygon], dtype=np.int32)
+                    self.polygon_list.append(polygon)
+
+
+                
+
+                left_img = v[window_top:window_bottom, :left_width]
+                right_img = v[window_top:window_bottom, right_wide:]
+                left_polygon_pts = [[0, window_top], [left_width - 1, window_top], [left_width - 1, window_bottom - 1], [0, window_bottom - 1]]
+                right_polygon_pts = [[right_wide, window_top], [frame_width - 1, window_top], [frame_width - 1, window_bottom - 1], [right_wide, window_bottom - 1]]
+                left_polygon_pts = np.array([left_polygon_pts], dtype=np.int32)
+                right_polygon_pts = np.array([right_polygon_pts], dtype=np.int32)
+                yuv_with_polygons = nxt.copy()
+                # for i in range(self.window_number):
+                #     if i == 0:
+                #         yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 255, 0), thickness=2)
+                #     elif i == self.window_number - 1:
+                #         yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 255, 0), thickness=2)
+                #     elif i >= self.leaning_left and i <= self.leaning_right:
+                #         yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(255, 0, 0), thickness=2)
+                #     elif i < self.leaning_left:
+                #        yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 255, 255), thickness=2)
+                #     elif i > self.leaning_right:
+                #         yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 255, 255), thickness=2)
+                    
+                    
+                yuv_with_polygons = cv.polylines(nxt.copy(), left_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
+                yuv_with_polygons = cv.polylines(yuv_with_polygons, right_polygon_pts, isClosed=True, color=(0, 255, 0), thickness=2)
+
+
+                # 儲存每個window的區域結果
+                # for i in range(self.window_number):
+                #     tempAns = self.yuv_estimate(self.window_list[i])
+                #     if(tempAns == "None" and self.last_state != ""):
+                #         self.window_state.append(self.last_state[i])
+                #     if(tempAns != "None"):
+                #         self.last_state[i] = tempAns
+                #         self.window_state.append(tempAns)
+
+
+                left_state = str(self.yuv_estimate(left_img))
+                right_state = str(self.yuv_estimate(right_img))
+                
+
+                if(last_left != ""):
+                    if(left_state == 'None'):
+                        left_state = last_left
+                if(last_right != ""):
+                    if(right_state == "None"):
+                        right_state = last_right
+
+                if(left_state != "None"):
+                    last_left = left_state
+                if(right_state != "None"):
+                    last_right = right_state
+
+                
+
+
+                    
+                if(left_state == "left") and (right_state == "right"):
+                    if len(motion_list) >= 3:
+                        motion_list.pop(0)
+                    motion_list.append("Straight")
+                elif(left_state == "left") and (right_state == "left"):
+                    if len(motion_list) >= 3:
+                        motion_list.pop(0)
+                    motion_list.append("Right")
+                elif(left_state == "right") and (right_state == "right"):
+                    if len(motion_list) >= 3:
+                        motion_list.pop(0)
+                    motion_list.append("Left")
+                elif(left_state == "stop") and (right_state == "stop"):
+                    if len(motion_list) >= 3:
+                        motion_list.pop(0)
+                    motion_list.append("Stop")
+                else:
+                    pass # stop and right
+
+                if(len(motion_list) >= 3):
+                    if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
+                        realMotion = motion_list[motion_index - 2]
+
+                # 畫上每個區域結果
+                # cv.putText(yuv_with_polygons, str(self.window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
+                # if(self.window_state[0] == ""):
+                #     self.window_result[0].append(0)
+                # else:
+                #     if frame_id > 1680:
+                #         self.window_result[0].append(-int(self.window_state[2]))
+                #     else:
+                #         self.window_result[0].append(int(self.window_state[0]))
+                
+
+                # if(self.window_state[1] == ""):
+                #     self.window_result[1].append(0)
+                # else:
+                #     self.window_result[1].append(int(self.window_state[1]))
+
+                # if(self.window_state[2] == ""):
+                #     self.window_result[2].append(0)
+                # else:
+                #     if frame_id > 1680:
+                #         self.window_result[2].append(-int(self.window_state[0]))
+                #     else:
+                #         self.window_result[2].append(int(self.window_state[2]))                
+
+
+
+                if(len(motion_list) >= 3):
+                    if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
+                        realMotion = motion_list[motion_index - 2]
+
+
+
+
+                cv.putText(yuv_with_polygons, left_state, (50,100), self.font, self.fontScale, self.fontColor, self.lineType)
+                cv.putText(yuv_with_polygons, right_state, (450,100), self.font, self.fontScale, self.fontColor, self.lineType)
+                # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
+                # cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
+                
+                if left_state == "None":
+                    left_state_list.append(0)
+                else:
+                    if frame_id > 1680:
+                        left_state_list.append(-int(right_state))
+                    else:
+                        left_state_list.append(int(left_state))
+
+                if right_state == "None":
+                    right_state_list.append(0)
+                else:
+                    if frame_id > 1680:
+                        right_state_list.append(-int(left_state))
+                    else:
+                        right_state_list.append(int(right_state))
+
+                y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
+                u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
+                v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
+                # cv.imshow("Original", nxt)
+                # cv.imshow("yuv", yuv)
+                # cv.imshow('YImage', y)
+                # cv.imshow('UImage', u)
+                # cv.imshow('VImage', v)
+                # cv.imshow("left", left_img)
+                # cv.imshow("right", right_img)
+                cv.imshow("polygons", yuv_with_polygons)
+
+                if self.save_frame:
+                    cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
+
+                # if cv.waitKey(25) & 0xFF == ord('q'):
+                #     break
+                
+                outputStream.write(yuv_with_polygons)
+                
+
+                frame_id += 1
+
+
+            # plt.plot(noiseList1, label="left")
+            # plt.plot(averageList, label="average")
+            # record = np.array(record)
+            # plt.plot(self.center_list, label="avg")
+            # plt.plot(self.center_without_avg_list, label="without_avg")
+            plt.plot(left_state_list, label="left_window")
+            plt.plot(right_state_list, label="right_window")
+            plt.xlabel("frame", {'fontsize':20})
+            plt.ylabel("MV row data", {'fontsize':20})
+            plt.legend(
+                loc='best',
+                fontsize=15,
+                shadow=True,
+                facecolor='#ccc',
+                edgecolor='#000',)
+            plt.savefig("plot.png")
+            plt.show()
+
+            outputStream.release()
+
 
 
 
 if __name__ == "__main__":
-    MV_on_Vechicle().run()
+    # MV_on_Vechicle().run_split_window()
+    MV_on_Vechicle().run_two_window()
