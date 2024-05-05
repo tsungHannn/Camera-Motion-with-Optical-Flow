@@ -21,7 +21,7 @@ V: 垂直向量(320*480)  V > 128:向上   V < 128:向下
 """
 
 class MV_on_Vechicle:
-    def __init__(self):
+    def __init__(self, mode):
         with open("mvs.yaml", "r") as file:
             mvs_data = yaml.load(file, Loader=yaml.FullLoader)
             self.cameraMatrix = np.array(mvs_data['camera_matrix']['data'])
@@ -29,7 +29,7 @@ class MV_on_Vechicle:
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
         self.scene = "outside"
-        self.window_number = 3
+        self.window_number = 40
         self.threshold = 8000
 
 		# specify directory and file name
@@ -72,6 +72,7 @@ class MV_on_Vechicle:
         self.last_state = []
         self.center_list = []
         self.center_without_avg_list = []
+        self.mode = mode
         
 
     # 輸入影像 輸出目前影像是往左還是右
@@ -82,49 +83,63 @@ class MV_on_Vechicle:
         translation = np.ravel(img)
         # nonzeros = np.where(translation != 128)
         # translation = translation[nonzeros]
-        left_index = np.where(translation < 128)
-        right_index = np.where(translation > 128)
+        right_index = np.where(translation < 128)
+        left_index = np.where(translation > 128)
 
-        left = translation[left_index]
-        right = translation[right_index]
+        left = translation[right_index]
+        right = translation[left_index]
 
         # value = 0
         # if len(left_index[0]) < 5000 and len(right_index[0]) < 5000:
         #     return "stop"
         if self.scene == "outside":
-            diff = len(left_index[0]) - len(right_index[0])
+            diff = len(right_index[0]) - len(left_index[0])
             # cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
             if diff > self.threshold:
-                return int((np.sum(left)/left.size) - 128)
+                return -int((np.sum(left)/left.size) - 128)
                 # return 1
                 # value = mode(left)[0][0]
-                return "left"
+                return "right"
             elif diff < -1 * self.threshold:
-                return int((np.sum(right)/right.size) - 128)
+                return -int((np.sum(right)/right.size) - 128)
                 # return -1
                 # value = mode(right)[0][0]
-                return "right"
-            else:
-                return "None"
-            # if len(left_index[0]) > len(right_index[0]):
-            #     value = mode(left)[0][0]
-            # elif len(left_index[0]) < len(right_index[0]):
-            #     value = mode(right)[0][0]
-        elif self.scene == "inside":
-            diff = len(left_index[0]) - len(right_index[0])
-            cv.putText(img, str(diff), (50,100), self.font, self.fontScale, self.fontColor, self.lineType)
-            if diff > 2000:
-                # value = mode(left)[0][0]
                 return "left"
-            elif diff < -2000:
-                # value = mode(right)[0][0]
-                return "right"
             else:
                 return "None"
             # if len(left_index[0]) > len(right_index[0]):
             #     value = mode(left)[0][0]
             # elif len(left_index[0]) < len(right_index[0]):
             #     value = mode(right)[0][0]
+
+    
+    def yuv_estimate_mapped(self, img):
+        self.threshold = img.shape[0]*img.shape[1]//3
+        
+        translation = np.ravel(img)
+        # nonzeros = np.where(translation != 128)
+        # translation = translation[nonzeros]
+        right_index = np.where(translation < 128)
+        left_index = np.where(translation > 128)
+
+        left = translation[right_index]
+        right = translation[left_index]
+
+        if self.scene == "outside":
+            diff = len(right_index[0]) - len(left_index[0])
+            # cv.putText(img, str(diff), (50,100), font, fontScale, fontColor, lineType)
+            if diff > self.threshold:
+                # return int((np.sum(left)/left.size) - 128)
+                return 1
+                # value = mode(left)[0][0]
+                return "right"
+            elif diff < -1 * self.threshold:
+                # return int((np.sum(right)/right.size) - 128)
+                return -1
+                # value = mode(right)[0][0]
+                return "left"
+            else:
+                return "None"
 
 
     # 把MV得到的X,Y軸向量加起來，得到每個pixel的大小跟角度
@@ -307,7 +322,10 @@ class MV_on_Vechicle:
 
                 # 儲存每個window的區域結果
                 for i in range(self.window_number):
-                    tempAns = self.yuv_estimate(self.window_list[i])
+                    if self.mode == "original":
+                        tempAns = self.yuv_estimate(self.window_list[i])
+                    elif self.mode == "mapped":
+                        tempAns = self.yuv_estimate_mapped(self.window_list[i])
                     if(tempAns == "None" and self.last_state != ""):
                         self.window_state.append(self.last_state[i])
                     if(tempAns != "None"):
@@ -350,19 +368,24 @@ class MV_on_Vechicle:
 
 
                     if center_avg == 0:
-                        motion_list.append("Left")
-                    elif center_avg == self.window_number - 1:
                         motion_list.append("Right")
+                    elif center_avg == self.window_number - 1:
+                        motion_list.append("Left")
                     elif center_avg >= self.leaning_left and center_avg <= self.leaning_right:
                         motion_list.append("Straight")
                     elif center_avg < self.leaning_left:
-                        motion_list.append("Leaning left")
-                    elif center_avg > self.leaning_right:
                         motion_list.append("Leaning right")
+                    elif center_avg > self.leaning_right:
+                        motion_list.append("Leaning left")
                 else:
                     self.center_list.append(0) # 為了畫圖合理
 
-
+                # 即時顯示圖表
+                # plt.clf()
+                # plt.plot(self.center_list)
+                # plt.pause(0.0001)
+                # plt.ioff
+                    
                 if(len(motion_list) >= 3):
                     if(motion_list[motion_index - 2] == motion_list[motion_index - 1] and motion_list[motion_index - 1] == motion_list[motion_index]):
                         realMotion = motion_list[motion_index - 2]
@@ -374,16 +397,16 @@ class MV_on_Vechicle:
                 # cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
                 # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
                 cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
-                
+                cv.putText(yuv_with_polygons, str(frame_id), (260, 450), self.font, 0.5, (0, 0, 255), 1)
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
                 v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
                 # cv.imshow("Original", nxt)
                 # cv.imshow("yuv", yuv)
-                cv.imshow('YImage', y)
-                cv.imshow('UImage', u)
-                cv.imshow('VImage', v)
+                # cv.imshow('YImage', y)
+                # cv.imshow('UImage', u)
+                # cv.imshow('VImage', v)
                 # cv.imshow("left", left_img)
                 # cv.imshow("right", right_img)
                 cv.imshow("polygons", yuv_with_polygons)
@@ -391,8 +414,8 @@ class MV_on_Vechicle:
                 if self.save_frame:
                     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-                if cv.waitKey(25) & 0xFF == ord('q'):
-                    break
+                # if cv.waitKey(25) & 0xFF == ord('q'):
+                #     break
                 
                 outputStream.write(yuv_with_polygons)
                 
@@ -400,26 +423,27 @@ class MV_on_Vechicle:
                 frame_id += 1
 
 
-            # plt.plot(noiseList1, label="left")
-            # plt.plot(averageList, label="average")
-            # record = np.array(record)
-            plt.plot(self.center_list, label="avg")
-            plt.plot(self.center_without_avg_list, label="without_avg")
-            # plt.plot(record[0])
-            # plt.plot(record[2])
-            plt.legend(
-                loc='best',
-                fontsize=20,
-                shadow=True,
-                facecolor='#ccc',
-                edgecolor='#000',
-                title='test',
-                title_fontsize=20)
-            plt.savefig("plot.png")
-            plt.show()
+            # # plt.plot(noiseList1, label="left")
+            # # plt.plot(averageList, label="average")
+            # # record = np.array(record)
+            # plt.plot(self.center_list, label="avg")
+            # plt.plot(self.center_without_avg_list, label="without_avg")
+            # # plt.plot(record[0])
+            # # plt.plot(record[2])
+            # plt.legend(
+            #     loc='best',
+            #     fontsize=20,
+            #     shadow=True,
+            #     facecolor='#ccc',
+            #     edgecolor='#000',
+            #     title='test',
+            #     title_fontsize=20)
+            # plt.savefig("plot.png")
+            # plt.show()
 
             outputStream.release()
-    
+
+    # ==============================================================================================
     def run_two_window(self):
         for file in self.all_file:
             filename = file
@@ -640,18 +664,18 @@ class MV_on_Vechicle:
                 if left_state == "None":
                     left_state_list.append(0)
                 else:
-                    if frame_id > 1680:
-                        left_state_list.append(-int(right_state))
-                    else:
-                        left_state_list.append(int(left_state))
+                    # if frame_id > 1680:
+                    #     left_state_list.append(-int(right_state))
+                    # else:
+                    left_state_list.append(int(left_state))
 
                 if right_state == "None":
                     right_state_list.append(0)
                 else:
-                    if frame_id > 1680:
-                        right_state_list.append(-int(left_state))
-                    else:
-                        right_state_list.append(int(right_state))
+                    # if frame_id > 1680:
+                    #     right_state_list.append(-int(left_state))
+                    # else:
+                    right_state_list.append(int(right_state))
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
@@ -668,8 +692,8 @@ class MV_on_Vechicle:
                 if self.save_frame:
                     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-                # if cv.waitKey(25) & 0xFF == ord('q'):
-                #     break
+                if cv.waitKey(25) & 0xFF == ord('q'):
+                    break
                 
                 outputStream.write(yuv_with_polygons)
                 
@@ -701,5 +725,31 @@ class MV_on_Vechicle:
 
 
 if __name__ == "__main__":
+    original = MV_on_Vechicle("original")
+    mapped = MV_on_Vechicle("mapped")
+    original.run_split_window()
+    mapped.run_split_window()
+    plt.cla()
+
+    plt.plot()
+     # plt.plot(noiseList1, label="left")
+            # plt.plot(averageList, label="average")
+            # record = np.array(record)
+    plt.plot(original.center_list, label="original")
+    plt.plot(mapped.center_list, label="mapped")
+    # plt.plot(record[0])
+    # plt.plot(record[2])
+    plt.xlabel("Frame", {'fontsize':20})
+    plt.ylabel("Center", {'fontsize':20})
+    plt.legend(
+        loc='best',
+        fontsize=20,
+        shadow=True,
+        facecolor='#ccc',
+        edgecolor='#000',
+        title='test',
+        title_fontsize=20)
+    plt.savefig("plot.png")
+    plt.show()
     # MV_on_Vechicle().run_split_window()
-    MV_on_Vechicle().run_two_window()
+    # MV_on_Vechicle().run_two_window()
