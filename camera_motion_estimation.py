@@ -414,8 +414,8 @@ class MV_on_Vechicle:
                 if self.save_frame:
                     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
-                # if cv.waitKey(25) & 0xFF == ord('q'):
-                #     break
+                if cv.waitKey(25) & 0xFF == ord('q'):
+                    break
                 
                 outputStream.write(yuv_with_polygons)
                 
