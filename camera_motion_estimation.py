@@ -368,15 +368,15 @@ class MV_on_Vechicle:
 
 
                     if center_avg == 0:
-                        motion_list.append("Right")
-                    elif center_avg == self.window_number - 1:
                         motion_list.append("Left")
+                    elif center_avg == self.window_number - 1:
+                        motion_list.append("Right")
                     elif center_avg >= self.leaning_left and center_avg <= self.leaning_right:
                         motion_list.append("Straight")
                     elif center_avg < self.leaning_left:
-                        motion_list.append("Leaning right")
-                    elif center_avg > self.leaning_right:
                         motion_list.append("Leaning left")
+                    elif center_avg > self.leaning_right:
+                        motion_list.append("Leaning right")
                 else:
                     self.center_list.append(0) # 為了畫圖合理
 
@@ -397,7 +397,7 @@ class MV_on_Vechicle:
                 # cv.putText(yuv_with_polygons, right_state, (450,100), font, fontScale, fontColor, lineType)
                 # cv.putText(yuv_with_polygons, str(motion_list), (50,200), font, fontScale, fontColor, lineType)
                 cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
-                cv.putText(yuv_with_polygons, str(frame_id), (260, 450), self.font, 0.5, (0, 0, 255), 1)
+                cv.putText(yuv_with_polygons, str(frame_id), (0, 20), self.font, 0.5, (0, 0, 255), 1)
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
@@ -411,8 +411,8 @@ class MV_on_Vechicle:
                 # cv.imshow("right", right_img)
                 cv.imshow("polygons", yuv_with_polygons)
 
-                if self.save_frame:
-                    cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
+                # if self.save_frame:
+                #     cv.imwrite(self.save + "\\" + str(frame_id) + ".jpg", yuv_with_polygons)
 
                 # if cv.waitKey(25) & 0xFF == ord('q'):
                 #     break
@@ -426,20 +426,22 @@ class MV_on_Vechicle:
             # # plt.plot(noiseList1, label="left")
             # # plt.plot(averageList, label="average")
             # # record = np.array(record)
-            # plt.plot(self.center_list, label="avg")
-            # plt.plot(self.center_without_avg_list, label="without_avg")
+            plt.plot(self.center_list, label="avg")
+            plt.plot(self.center_without_avg_list, label="without_avg")
             # # plt.plot(record[0])
             # # plt.plot(record[2])
-            # plt.legend(
-            #     loc='best',
-            #     fontsize=20,
-            #     shadow=True,
-            #     facecolor='#ccc',
-            #     edgecolor='#000',
-            #     title='test',
-            #     title_fontsize=20)
-            # plt.savefig("plot.png")
-            # plt.show()
+            plt.xlabel("Frame", {'fontsize':20})
+            plt.ylabel("Center", {'fontsize':20})
+            plt.legend(
+                loc='best',
+                fontsize=20,
+                shadow=True,
+                facecolor='#ccc',
+                edgecolor='#000',
+                title='test',
+                title_fontsize=20)
+            plt.savefig("plot.png")
+            plt.show()
 
             outputStream.release()
 
@@ -726,30 +728,30 @@ class MV_on_Vechicle:
 
 if __name__ == "__main__":
     original = MV_on_Vechicle("original")
-    mapped = MV_on_Vechicle("mapped")
+    # mapped = MV_on_Vechicle("mapped")
     original.run_split_window()
-    mapped.run_split_window()
-    plt.cla()
+    # mapped.run_split_window()
+    # plt.cla()
 
-    plt.plot()
-     # plt.plot(noiseList1, label="left")
-            # plt.plot(averageList, label="average")
-            # record = np.array(record)
-    plt.plot(original.center_list, label="original")
-    plt.plot(mapped.center_list, label="mapped")
-    # plt.plot(record[0])
-    # plt.plot(record[2])
-    plt.xlabel("Frame", {'fontsize':20})
-    plt.ylabel("Center", {'fontsize':20})
-    plt.legend(
-        loc='best',
-        fontsize=20,
-        shadow=True,
-        facecolor='#ccc',
-        edgecolor='#000',
-        title='test',
-        title_fontsize=20)
-    plt.savefig("plot.png")
-    plt.show()
+    # plt.plot()
+    #  # plt.plot(noiseList1, label="left")
+    #         # plt.plot(averageList, label="average")
+    #         # record = np.array(record)
+    # # plt.plot(original.center_list, label="original")
+    # plt.plot(mapped.center_list, label="mapped")
+    # # plt.plot(record[0])
+    # # plt.plot(record[2])
+    # plt.xlabel("Frame", {'fontsize':20})
+    # plt.ylabel("Center", {'fontsize':20})
+    # plt.legend(
+    #     loc='best',
+    #     fontsize=20,
+    #     shadow=True,
+    #     facecolor='#ccc',
+    #     edgecolor='#000',
+    #     title='test',
+    #     title_fontsize=20)
+    # plt.savefig("plot.png")
+    # plt.show()
     # MV_on_Vechicle().run_split_window()
     # MV_on_Vechicle().run_two_window()
