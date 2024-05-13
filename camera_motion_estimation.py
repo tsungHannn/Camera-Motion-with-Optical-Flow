@@ -27,8 +27,8 @@ class MV_on_Vechicle:
         self.threshold = 8000
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\0318"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
+        # self.dir_path = "mvs_mp4\\0318"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
 
 		# self.all_file = os.listdir(self.dir_path)
         self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"]
@@ -179,10 +179,17 @@ class MV_on_Vechicle:
                 yuv_with_polygons = nxt.copy()
                 for i in range(self.window_number):
                     # Calculate blue channel value for gradient
-                    blue_value = int(255 * (1 - abs(i - self.window_number/2) / (self.window_number/2)) + 100)
+                    # blue_value = int(255 * (1 - abs(i - self.window_number/2) / (self.window_number/2)) + 100)
+
+                    # Calculate blue channel value for gradient (from light blue to dark blue)
+                    blue_value = int(255 * (self.window_number - i) / self.window_number + 80)
+
+                    # Calculate red channel value for gradient (from light red to dark red)
+                    red_value = int(255 * i / self.window_number + 80)
 
                     # Draw polygon with calculated color
-                    color_bgr = (255, blue_value, 70)
+                    # color_bgr = (255, blue_value, 70)
+                    color_bgr = (red_value, 30, blue_value)
                     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
                     # 漸層
                     # yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 0, 0), thickness=2)
@@ -238,7 +245,7 @@ class MV_on_Vechicle:
                     center_avg = int(center_sum / 20)
 
                     self.center_list.append(center_avg)
-                    cv.circle(yuv_with_polygons, ((frame_width*center_avg//self.window_number)+8, window_top+10), 5, (0, 0, 255), 2)
+                    cv.circle(yuv_with_polygons, ((frame_width*center_avg//self.window_number)+8, window_top+10), 6, (31, 198, 0), -1)
 
                     if len(motion_list) >= 3:
                         motion_list.pop(0)
