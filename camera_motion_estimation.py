@@ -23,15 +23,17 @@ class MV_on_Vechicle:
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
-        self.window_number = 40
+        self.lr_window_number = 40
+        self.ud_window_number = 10
         self.threshold = 8000
 
 		# specify directory and file name
         # self.dir_path = "mvs_mp4\\0318"
         self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
 
-		# self.all_file = os.listdir(self.dir_path)
-        self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"]
+        # self.all_file = os.listdir(self.dir_path)
+        self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
+        # self.all_file = ["test_2024-05-21-08-10-00_mvs_compressed.mp4"]
 
 
   
@@ -45,17 +47,22 @@ class MV_on_Vechicle:
         self.leaning_right = 24
         self.leaning_left = 16
 
-        self.window_list = [] # 存每個window
-        self.window_state = [] # 每個window的區域結果
+        self.lr_window_list = [] # 存每個window(左右)
+        self.ud_window_list = [] # 上下window
+        self.lr_window_state = [] # 每個window的區域結果
+        self.ud_window_state = []
         self.polygon_list = [] # 畫每個window的範圍
-        self.window_result = [] # 存每個window的結果
+        self.lr_window_result = [] # 存每個window的結果
+        self.ud_window_result = []
         self.record = []
-        self.last_state = []
+        self.lr_last_state = [] # 方向點數量沒超過閥值的話就使用上一次的結果
+        self.ud_last_state = []
         self.center_list = []
-        self.center_without_avg_list = []
+        self.lr_center_without_avg_list = []
+        self.ud_center_without_avg_list = []
         
-    
-    def yuv_estimate(self, img):
+    # estimate left or right
+    def lr_estimate(self, img):
         self.threshold = img.shape[0]*img.shape[1]//3
         
         translation = np.ravel(img)
@@ -68,6 +75,23 @@ class MV_on_Vechicle:
             return 1 # 向右
         elif diff < -1 * self.threshold:
             return -1 # 向左
+        else:
+            return "None"
+    
+    # estimate up or down
+    def ud_estimate(self, img):
+        self.threshold = img.shape[0]*img.shape[1]//3
+        
+        translation = np.ravel(img)
+
+        down_index = np.where(translation < 128)
+        up_index = np.where(translation > 128)
+
+        diff = len(down_index[0]) - len(up_index[0])
+        if diff > self.threshold:
+            return 1 # 向下
+        elif diff < -1 * self.threshold:
+            return -1 # 向上
         else:
             return "None"
 
@@ -92,7 +116,7 @@ class MV_on_Vechicle:
 
         if best_index == 0:
             if np.sum(arr) < 0:
-                best_index = self.window_number - 1
+                best_index = self.lr_window_number - 1
             elif np.sum(arr) > 0:
                 best_index = 0
 
@@ -121,24 +145,31 @@ class MV_on_Vechicle:
 
 
             # initialise text variables to draw on frames
-            motion_list = []
-            realMotion = 'None'
+            # motion_list = []
+            # realMotion = 'None'
 
 
             frame_id = 0
             frame_width = int(cap.get(3))
             frame_height = int(cap.get(4))
-            window_width = frame_width // self.window_number
+            window_width = frame_width // self.lr_window_number
+
+            # 前面的frame_height-(frame_height//10 * 2)是為了不要底下雨刷的部份，不要底下的1/5範圍
+            window_height = (frame_height-(frame_height//5)) // self.ud_window_number 
 
             window_bottom = frame_height // 4 * 3
             window_top = frame_height // 8
 
 
-            for i in range(self.window_number):
-                self.last_state.append("")
+            for i in range(self.lr_window_number):
+                self.lr_last_state.append("")
+                self.lr_window_result.append([])
+                
             
-            for i in range(self.window_number):
-                self.window_result.append([])
+
+            for i in range(self.ud_window_number):
+                self.ud_last_state.append("")
+                self.ud_window_result.append([])
             # main loop
             while True:
                 # read a new frame
@@ -157,42 +188,51 @@ class MV_on_Vechicle:
 
 
 
-                self.window_list.clear()
+                self.lr_window_list.clear()
+                self.ud_window_list.clear()
                 self.polygon_list.clear()
-                self.window_state.clear()
-                for i in range(self.window_number):
-                    self.window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                self.lr_window_state.clear()
+
+                # 直切
+                for i in range(self.lr_window_number):
+                    self.lr_window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
 
                     # # 實際偵測範圍
                     # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
 
-                    # 示意框
-                    polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_top + 20], [window_width*i, window_top + 20]]
+                    # # 示意框
+                    # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_top + 20], [window_width*i, window_top + 20]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
+
+                # 橫切
+                for i in range(self.ud_window_number):
+                    self.ud_window_list.append(u[window_height*i:window_height*(i+1), 0:frame_width])
+
+                    # 實際偵測範圍
+                    polygon = [[0, window_height*i], [frame_width, window_height*i], [frame_width, window_height*(i+1)], [0, window_height*(i+1)]]
                     polygon = np.array([polygon], dtype=np.int32)
                     self.polygon_list.append(polygon)
 
 
-                # 畫偵測區域
-
+                # 畫偵測區域(漸層)
                 yuv_with_polygons = nxt.copy()
-                for i in range(self.window_number):
+                # for i in range(self.lr_window_number):
+                #     # Calculate blue channel value for gradient
+                #     blue_value = int(255 * (self.lr_window_number - i) / self.lr_window_number + 80)
+                #     red_value = int(255 * i / self.lr_window_number + 80)
+                #     # Draw polygon with calculated color
+                #     color_bgr = (red_value, 30, blue_value)
+                #     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
+                for i in range(self.ud_window_number):
                     # Calculate blue channel value for gradient
-                    # blue_value = int(255 * (1 - abs(i - self.window_number/2) / (self.window_number/2)) + 100)
-
-                    # Calculate blue channel value for gradient (from light blue to dark blue)
-                    blue_value = int(255 * (self.window_number - i) / self.window_number + 80)
-
-                    # Calculate red channel value for gradient (from light red to dark red)
-                    red_value = int(255 * i / self.window_number + 80)
-
+                    blue_value = int(255 * (self.ud_window_number - i) / self.ud_window_number + 80)
+                    red_value = int(255 * i / self.ud_window_number + 80)
                     # Draw polygon with calculated color
-                    # color_bgr = (255, blue_value, 70)
                     color_bgr = (red_value, 30, blue_value)
                     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
-                    # 漸層
-                    # yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 0, 0), thickness=2)
 
                     
                     
@@ -211,64 +251,90 @@ class MV_on_Vechicle:
 #                         yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=(0, 255, 255), thickness=2)
 
                     
-                # 儲存每個window的區域結果
-                for i in range(self.window_number):
-                    tempAns = self.yuv_estimate(self.window_list[i])
-                    if(tempAns == "None" and self.last_state != ""):
-                        self.window_state.append(self.last_state[i])
+                # 儲存每個window的區域結果(左右)
+                for i in range(self.lr_window_number):
+                    tempAns = self.lr_estimate(self.lr_window_list[i])
+                    if(tempAns == "None"):
+                        self.lr_window_state.append(self.lr_last_state[i])
                     if(tempAns != "None"):
-                        self.last_state[i] = tempAns
-                        self.window_state.append(tempAns)
+                        self.lr_last_state[i] = tempAns
+                        self.lr_window_state.append(tempAns)
+                    
                 
+                # 儲存每個window的區域結果(上下)
+                for i in range(self.ud_window_number):
+                    tempAns = self.ud_estimate(self.ud_window_list[i])
+                    if(tempAns == "None"):
+                        self.ud_window_state.append(self.ud_last_state[i])
+                    if(tempAns != "None"):
+                        self.ud_last_state[i] = tempAns
+                        self.ud_window_state.append(tempAns)
 
-                # 畫上每個區域結果
-                tempRow = []
-                for i in range(self.window_number):
+
+                # 畫上每個區域結果(左右)
+                lr_tempRow = []
+                for i in range(self.lr_window_number):
                     # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
-                    if(self.window_state[i] == ""):
-                        self.window_result[i].append(0)
-                        tempRow.append(0)
+                    if(self.lr_window_state[i] == ""):
+                        self.lr_window_result[i].append(0)
+                        lr_tempRow.append(0)
                     else:
-                        self.window_result[i].append(int(self.window_state[i]))
-                        tempRow.append(int(self.window_state[i]))
+                        self.lr_window_result[i].append(int(self.lr_window_state[i]))
+                        lr_tempRow.append(int(self.lr_window_state[i]))
                 
+                # 畫上每個區域結果(上下)
+                ud_tempRow = []
+                for i in range(self.ud_window_number):
+                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
+                    if(self.ud_window_state[i] == ""):
+                        self.ud_window_result[i].append(0)
+                        ud_tempRow.append(0)
+                    else:
+                        self.ud_window_result[i].append(int(self.ud_window_state[i]))
+                        ud_tempRow.append(int(self.ud_window_state[i]))
 
-                center = self.find_center(tempRow)
-                self.center_without_avg_list.append(center)
+
+
+                lr_center = self.find_center(lr_tempRow)
+                self.lr_center_without_avg_list.append(lr_center)
+                ud_center = self.find_center(ud_tempRow)
+                self.ud_center_without_avg_list.append(ud_center)
+
+
 
                 # 20 幀後才開始算
-                if len(self.center_without_avg_list) >= 20:
+                if len(self.lr_center_without_avg_list) >= 20:
                     center_sum = 0
                     for i in range(1, 21):
-                        center_sum += self.center_without_avg_list[-i]
+                        center_sum += self.lr_center_without_avg_list[-i]
 
                     center_avg = int(center_sum / 20)
 
                     self.center_list.append(center_avg)
-                    cv.circle(yuv_with_polygons, ((frame_width*center_avg//self.window_number)+8, window_top+10), 6, (31, 198, 0), -1)
+                    cv.circle(yuv_with_polygons, ((frame_width*center_avg//self.lr_window_number)+8, window_top+10), 6, (31, 198, 0), -1)
 
-                    if len(motion_list) >= 3:
-                        motion_list.pop(0)
+                    # if len(motion_list) >= 3:
+                    #     motion_list.pop(0)
 
 
-                    if center_avg == 0:
-                        motion_list.append("Left")
-                    elif center_avg == self.window_number - 1:
-                        motion_list.append("Right")
-                    elif center_avg >= self.leaning_left and center_avg <= self.leaning_right:
-                        motion_list.append("Straight")
-                    elif center_avg < self.leaning_left:
-                        motion_list.append("Leaning left")
-                    elif center_avg > self.leaning_right:
-                        motion_list.append("Leaning right")
+                    # if center_avg == 0:
+                    #     motion_list.append("Left")
+                    # elif center_avg == self.lr_window_number - 1:
+                    #     motion_list.append("Right")
+                    # elif center_avg >= self.leaning_left and center_avg <= self.leaning_right:
+                    #     motion_list.append("Straight")
+                    # elif center_avg < self.leaning_left:
+                    #     motion_list.append("Leaning left")
+                    # elif center_avg > self.leaning_right:
+                    #     motion_list.append("Leaning right")
                 else:
                     self.center_list.append(0) # 為了畫圖合理，前面20幀沒有數據補0
 
 
                     
-                if(len(motion_list) >= 3):
-                    if(motion_list[0] == motion_list[1] and motion_list[1] == motion_list[2]):
-                        realMotion = motion_list[0]
+                # if(len(motion_list) >= 3):
+                #     if(motion_list[0] == motion_list[1] and motion_list[1] == motion_list[2]):
+                #         realMotion = motion_list[0]
 
 
                 # cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
@@ -279,7 +345,10 @@ class MV_on_Vechicle:
                 v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
 
                 cv.imshow("polygons", yuv_with_polygons)
-
+                cv.imshow("u", u)
+                cv.imshow("v", v)
+                # for i in range(self.window_number):
+                #     cv.imshow(str(i), self.lr_window_list[i])
 
                 if cv.waitKey(25) & 0xFF == ord('q'):
                     break
