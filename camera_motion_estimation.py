@@ -28,12 +28,12 @@ class MV_on_Vechicle:
         self.threshold = 8000
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0318"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
+        self.dir_path = "mvs_mp4\\0521"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
 
         # self.all_file = os.listdir(self.dir_path)
-        self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
-        # self.all_file = ["test_2024-05-21-08-10-00_mvs_compressed.mp4"]
+        # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
+        self.all_file = ["test_2024-05-21-08-05-38_mvs_compressed.mp4"] # 0521
 
 
   
@@ -57,7 +57,8 @@ class MV_on_Vechicle:
         self.record = []
         self.lr_last_state = [] # 方向點數量沒超過閥值的話就使用上一次的結果
         self.ud_last_state = []
-        self.center_list = []
+        self.lr_center_list = [] # 紀錄中央點，畫圖用
+        self.ud_center_list = []
         self.lr_center_without_avg_list = []
         self.ud_center_without_avg_list = []
         
@@ -80,7 +81,7 @@ class MV_on_Vechicle:
     
     # estimate up or down
     def ud_estimate(self, img):
-        self.threshold = img.shape[0]*img.shape[1]//3
+        self.threshold = img.shape[0]*img.shape[1]//10
         
         translation = np.ravel(img)
 
@@ -116,7 +117,7 @@ class MV_on_Vechicle:
 
         if best_index == 0:
             if np.sum(arr) < 0:
-                best_index = self.lr_window_number - 1
+                best_index = len(arr) - 1
             elif np.sum(arr) > 0:
                 best_index = 0
 
@@ -155,7 +156,9 @@ class MV_on_Vechicle:
             window_width = frame_width // self.lr_window_number
 
             # 前面的frame_height-(frame_height//10 * 2)是為了不要底下雨刷的部份，不要底下的1/5範圍
-            window_height = (frame_height-(frame_height//5)) // self.ud_window_number 
+            window_height = (frame_height-(frame_height//5)) // self.ud_window_number
+            window_left = frame_width // 4
+            window_right = frame_width // 4 * 3
 
             window_bottom = frame_height // 4 * 3
             window_top = frame_height // 8
@@ -192,6 +195,7 @@ class MV_on_Vechicle:
                 self.ud_window_list.clear()
                 self.polygon_list.clear()
                 self.lr_window_state.clear()
+                self.ud_window_state.clear()
 
                 # 直切
                 for i in range(self.lr_window_number):
@@ -207,12 +211,31 @@ class MV_on_Vechicle:
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
 
-                # 橫切
-                for i in range(self.ud_window_number):
-                    self.ud_window_list.append(u[window_height*i:window_height*(i+1), 0:frame_width])
+                # # 橫切 (把上面切掉)
+                # for i in range(self.ud_window_number):
+                #     self.ud_window_list.append(u[window_top+window_height*i:window_top+window_height*(i+1), window_left:window_right])
 
-                    # 實際偵測範圍
-                    polygon = [[0, window_height*i], [frame_width, window_height*i], [frame_width, window_height*(i+1)], [0, window_height*(i+1)]]
+                #     # # 實際偵測範圍
+                #     # polygon = [[window_left, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right,window_top+ window_height*(i+1)], [window_left, window_top+window_height*(i+1)]]
+                #     # polygon = np.array([polygon], dtype=np.int32)
+                #     # self.polygon_list.append(polygon)
+
+                #     # 示意框
+                #     polygon = [[window_right-20, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right, window_top+window_height*(i+1)], [window_right-20, window_top+window_height*(i+1)]]
+                #     polygon = np.array([polygon], dtype=np.int32)
+                #     self.polygon_list.append(polygon)
+                
+                # 橫切 (保留最上面)
+                for i in range(self.ud_window_number):
+                    self.ud_window_list.append(u[window_height*i:window_height*(i+1), window_left:window_right])
+
+                    # # 實際偵測範圍
+                    # polygon = [[window_left, window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_left, window_height*(i+1)]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
+
+                    # 示意框
+                    polygon = [[window_right-20,window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_right-20, window_height*(i+1)]]
                     polygon = np.array([polygon], dtype=np.int32)
                     self.polygon_list.append(polygon)
 
@@ -285,7 +308,7 @@ class MV_on_Vechicle:
                 # 畫上每個區域結果(上下)
                 ud_tempRow = []
                 for i in range(self.ud_window_number):
-                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
+                    # cv.putText(yuv_with_polygons, str(self.ud_window_state[i]), (10, window_height*i+30), self.font, self.fontScale, self.fontColor, self.lineType)
                     if(self.ud_window_state[i] == ""):
                         self.ud_window_result[i].append(0)
                         ud_tempRow.append(0)
@@ -304,14 +327,24 @@ class MV_on_Vechicle:
 
                 # 20 幀後才開始算
                 if len(self.lr_center_without_avg_list) >= 20:
-                    center_sum = 0
+                    lr_center_sum = 0
+                    ud_center_sum = 0
                     for i in range(1, 21):
-                        center_sum += self.lr_center_without_avg_list[-i]
+                        lr_center_sum += self.lr_center_without_avg_list[-i]
+                        ud_center_sum += self.ud_center_without_avg_list[-i]
 
-                    center_avg = int(center_sum / 20)
+                    lr_center_avg = int(lr_center_sum / 20)
+                    ud_center_avg = int(ud_center_sum / 20)
 
-                    self.center_list.append(center_avg)
-                    cv.circle(yuv_with_polygons, ((frame_width*center_avg//self.lr_window_number)+8, window_top+10), 6, (31, 198, 0), -1)
+                    # 畫中心位置
+                    self.lr_center_list.append(lr_center_avg)
+                    # cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+8, window_top+10), 6, (31, 198, 0), -1)
+                    
+                    self.ud_center_list.append(ud_center_avg)
+                    # # 把上面切掉
+                    # cv.circle(yuv_with_polygons, (window_right-10, window_top+window_height*ud_center_avg + 15), 6, (255, 0, 0), -1)
+                    # # 保留最上面
+                    cv.circle(yuv_with_polygons, (window_right-10, window_height*ud_center_avg + 15), 6, (255, 0, 0), -1)
 
                     # if len(motion_list) >= 3:
                     #     motion_list.pop(0)
@@ -328,7 +361,7 @@ class MV_on_Vechicle:
                     # elif center_avg > self.leaning_right:
                     #     motion_list.append("Leaning right")
                 else:
-                    self.center_list.append(0) # 為了畫圖合理，前面20幀沒有數據補0
+                    self.lr_center_list.append(0) # 為了畫圖合理，前面20幀沒有數據補0
 
 
                     
@@ -370,7 +403,7 @@ if __name__ == "__main__":
     plt.cla()
 
     plt.plot()
-    plt.plot(detector.center_list, label="mapped")
+    plt.plot(detector.lr_center_list, label="mapped")
 
     plt.xlabel("Frame", {'fontsize':20})
     plt.ylabel("Center", {'fontsize':20})
