@@ -3,9 +3,7 @@ right/
 average/
 best/
 worst/
+result/
 mvs_mp4
-motion_test*.mp4
+*.mp4
 save/
-motion_T2_301_01.mp4
-T2_301_01.mp4
-motion_*.mp4
