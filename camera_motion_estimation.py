@@ -162,7 +162,7 @@ class MV_on_Vechicle:
             window_width = frame_width // self.lr_window_number
 
             # 前面的frame_height-(frame_height//10 * 2)是為了不要底下雨刷的部份，不要底下的1/5範圍
-            window_height = (frame_height-(frame_height//5)) // self.ud_window_number
+            window_height = (frame_height-(frame_height//3)) // self.ud_window_number
             window_left = frame_width // 4
             window_right = frame_width // 4 * 3
             # window_left = 0
@@ -223,41 +223,49 @@ class MV_on_Vechicle:
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
 
-                # # 橫切 (把上面切掉)
-                # for i in range(self.ud_window_number):
-                #     self.ud_window_list.append(u[window_top+window_height*i:window_top+window_height*(i+1), window_left:window_right])
-
-                #     # # 實際偵測範圍
-                #     # polygon = [[window_left, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right,window_top+ window_height*(i+1)], [window_left, window_top+window_height*(i+1)]]
-                #     # polygon = np.array([polygon], dtype=np.int32)
-                #     # self.polygon_list.append(polygon)
-
-                #     # 示意框
-                #     polygon = [[window_right-20, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right, window_top+window_height*(i+1)], [window_right-20, window_top+window_height*(i+1)]]
-                #     polygon = np.array([polygon], dtype=np.int32)
-                #     self.polygon_list.append(polygon)
-                
-                # 橫切 (保留最上面)
+                # 橫切 (把上面切掉)
                 for i in range(self.ud_window_number):
-                    # self.ud_window_list_r.append(u[window_height*i:window_height*(i+1), window_left:window_right])
-                    self.ud_window_list_R.append(u[window_height*i:window_height*(i+1), 0:frame_width//3])
-                    self.ud_window_list_L.append(u[window_height*i:window_height*(i+1), frame_width//3*2:frame_width])
-
-
+                    self.ud_window_list_R.append(u[window_top+window_height*i:window_top+window_height*(i+1), 0:frame_width])
+                    # self.ud_window_list_R.append(u[window_top+window_height*i:window_top+window_height*(i+1), 0:frame_width//3])
+                    # self.ud_window_list_L.append(u[window_top+window_height*i:window_top+window_height*(i+1), frame_width//3*2:frame_width])
                     # 實際偵測範圍
-                    # polygon = [[window_left, window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_left, window_height*(i+1)]]
-                    # polygon = np.array([polygon], dtype=np.int32)
-                    polygon = [[0, window_height*i], [frame_width//3, window_height*i], [frame_width//3, window_height*(i+1)], [0, window_height*(i+1)]]
+                    polygon = [[1, window_top+window_height*i], [frame_width-1, window_top+window_height*i], [frame_width-1,window_top+ window_height*(i+1)], [1, window_top+window_height*(i+1)]]
                     polygon = np.array([polygon], dtype=np.int32)
                     self.polygon_list.append(polygon)
-
-                    polygon = [[frame_width//3*2, window_height*i], [frame_width, window_height*i], [frame_width, window_height*(i+1)], [frame_width//3*2, window_height*(i+1)]]
-                    polygon = np.array([polygon], dtype=np.int32)
-                    self.polygon_list.append(polygon)
-                    # # 示意框
-                    # polygon = [[window_right-20,window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_right-20, window_height*(i+1)]]
+                    # polygon = [[0, window_top+window_height*i], [frame_width//3, window_top+window_height*i], [frame_width//3, window_top+window_height*(i+1)], [0, window_top+window_height*(i+1)]]
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
+
+                    # polygon = [[frame_width//3*2, window_top+window_height*i], [frame_width, window_top+window_height*i], [frame_width, window_top+window_height*(i+1)], [frame_width//3*2, window_top+window_height*(i+1)]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
+
+                    # # 示意框
+                    # polygon = [[window_right-20, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right, window_top+window_height*(i+1)], [window_right-20, window_top+window_height*(i+1)]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
+                
+                # # 橫切 (保留最上面)
+                # for i in range(self.ud_window_number):
+                #     # self.ud_window_list_r.append(u[window_height*i:window_height*(i+1), window_left:window_right])
+                #     self.ud_window_list_R.append(u[window_height*i:window_height*(i+1), 0:frame_width//3])
+                #     self.ud_window_list_L.append(u[window_height*i:window_height*(i+1), frame_width//3*2:frame_width])
+
+
+                #     # 實際偵測範圍
+                #     # polygon = [[window_left, window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_left, window_height*(i+1)]]
+                #     # polygon = np.array([polygon], dtype=np.int32)
+                #     polygon = [[0, window_height*i], [frame_width//3, window_height*i], [frame_width//3, window_height*(i+1)], [0, window_height*(i+1)]]
+                #     polygon = np.array([polygon], dtype=np.int32)
+                #     self.polygon_list.append(polygon)
+
+                #     polygon = [[frame_width//3*2, window_height*i], [frame_width, window_height*i], [frame_width, window_height*(i+1)], [frame_width//3*2, window_height*(i+1)]]
+                #     polygon = np.array([polygon], dtype=np.int32)
+                #     self.polygon_list.append(polygon)
+                #     # # 示意框
+                #     # polygon = [[window_right-20,window_height*i], [window_right, window_height*i], [window_right, window_height*(i+1)], [window_right-20, window_height*(i+1)]]
+                #     # polygon = np.array([polygon], dtype=np.int32)
+                #     # self.polygon_list.append(polygon)
 
 
                 # 畫偵測區域(漸層)
@@ -307,17 +315,17 @@ class MV_on_Vechicle:
                 # 儲存每個window的區域結果(上下)
                 for i in range(self.ud_window_number):
                     tempAns_R = self.ud_estimate(self.ud_window_list_R[i])
-                    tempAns_L = self.ud_estimate(self.ud_window_list_L[i])
+                    # tempAns_L = self.ud_estimate(self.ud_window_list_L[i])
                     if(tempAns_R == "None"):
                         self.ud_window_state_R.append(self.ud_last_state_R[i])
                     if(tempAns_R != "None"):
                         self.ud_last_state_R[i] = tempAns_R
                         self.ud_window_state_R.append(tempAns_R)
-                    if(tempAns_L == "None"):
-                        self.ud_window_state_L.append(self.ud_last_state_L[i])
-                    if(tempAns_L != "None"):
-                        self.ud_last_state_L[i] = tempAns_L
-                        self.ud_window_state_L.append(tempAns_L)
+                    # if(tempAns_L == "None"):
+                    #     self.ud_window_state_L.append(self.ud_last_state_L[i])
+                    # if(tempAns_L != "None"):
+                    #     self.ud_last_state_L[i] = tempAns_L
+                    #     self.ud_window_state_L.append(tempAns_L)
 
 
                 # 畫上每個區域結果(左右)
@@ -342,50 +350,53 @@ class MV_on_Vechicle:
                     else:
                         self.ud_window_result_R[i].append(int(self.ud_window_state_R[i]))
                         ud_tempRow_R.append(int(self.ud_window_state_R[i]))
-                    if(self.ud_window_state_L[i] == ""):
-                        self.ud_window_result_L[i].append(0)
-                        ud_tempRow_L.append(0)
-                    else:
-                        self.ud_window_result_L[i].append(int(self.ud_window_state_L[i]))
-                        ud_tempRow_L.append(int(self.ud_window_state_L[i]))
+                    # if(self.ud_window_state_L[i] == ""):
+                    #     self.ud_window_result_L[i].append(0)
+                    #     ud_tempRow_L.append(0)
+                    # else:
+                    #     self.ud_window_result_L[i].append(int(self.ud_window_state_L[i]))
+                    #     ud_tempRow_L.append(int(self.ud_window_state_L[i]))
 
 
                 lr_center = self.find_center(lr_tempRow)
                 self.lr_center_without_avg_list.append(lr_center)
                 ud_center_R = self.find_center(ud_tempRow_R)
                 self.ud_center_without_avg_list_R.append(ud_center_R)
-                ud_center_L = self.find_center(ud_tempRow_L)
-                self.ud_center_without_avg_list_L.append(ud_center_L)
+                # ud_center_L = self.find_center(ud_tempRow_L)
+
+                # ud_center = (ud_center_L + ud_center_R) / 2
+                # self.ud_center_without_avg_list_L.append(ud_center) # 方便起見就用這個當作左右相加後的平均值
 
 
                 # 20 幀後才開始算
                 if len(self.lr_center_without_avg_list) >= 20:
                     lr_center_sum = 0
                     ud_center_sum_R = 0
-                    ud_center_sum_L = 0
+                    # ud_center_sum_L = 0
                     for i in range(1, 21):
                         lr_center_sum += self.lr_center_without_avg_list[-i]
                         ud_center_sum_R += self.ud_center_without_avg_list_R[-i]
-                        ud_center_sum_L += self.ud_center_without_avg_list_L[-i]
+                        # ud_center_sum_L += self.ud_center_without_avg_list_L[-i]
 
                     lr_center_avg = int(lr_center_sum / 20)
                     ud_center_avg_R = int(ud_center_sum_R / 20)
-                    ud_center_avg_L = int(ud_center_sum_L / 20)
+                    # ud_center_avg_L = int(ud_center_sum_L / 20)
 
                     # 畫中心位置
                     self.lr_center_list.append(lr_center_avg)
                     # cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+8, window_top+10), 6, (31, 198, 0), -1)
                     
                     self.ud_center_list_R.append(ud_center_avg_R)
-                    self.ud_center_list_L.append(ud_center_avg_L)
-                    ud_center_avg = (ud_center_avg_R + ud_center_avg_L) // 2
+                    # self.ud_center_list_L.append(ud_center_avg_L)
                     # # 把上面切掉
-                    # cv.circle(yuv_with_polygons, (window_right-10, window_top+window_height*ud_center_avg + 15), 6, (255, 0, 0), -1)
+                    cv.circle(yuv_with_polygons, (window_right-10, window_top+window_height*ud_center_avg_R + 15), 6, (255, 0, 0), -1)
+                    # cv.circle(yuv_with_polygons, (frame_width//2, window_top+window_height*ud_center_avg_L + 15), 6, (0, 0, 255), -1)
+
                     # # 保留最上面
                     # cv.circle(yuv_with_polygons, (window_right-10, window_height*ud_center_avg_R + 15), 6, (255, 0, 0), -1)
-                    cv.circle(yuv_with_polygons, (10, window_height*ud_center_avg_L + 15), 6, (255, 0, 0), -1)
-                    cv.circle(yuv_with_polygons, (frame_width-10, window_height*ud_center_avg_R + 15), 6, (255, 0, 0), -1)
-                    cv.circle(yuv_with_polygons, (frame_width//2, window_height*ud_center_avg + 15), 6, (0, 0, 255), -1)
+                    # cv.circle(yuv_with_polygons, (10, window_height*ud_center_avg_L + 15), 6, (255, 0, 0), -1)
+                    # cv.circle(yuv_with_polygons, (frame_width-10, window_height*ud_center_avg_R + 15), 6, (255, 0, 0), -1)
+                    # cv.circle(yuv_with_polygons, (frame_width//2, window_height*ud_center_avg_L + 15), 6, (0, 0, 255), -1)
                     # if len(motion_list) >= 3:
                     #     motion_list.pop(0)
 
