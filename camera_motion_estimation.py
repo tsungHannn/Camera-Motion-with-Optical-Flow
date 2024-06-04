@@ -33,7 +33,7 @@ class MV_on_Vechicle:
 
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
-        self.all_file = ["test_2024-05-21-08-05-38_mvs_compressed.mp4"] # 0521
+        self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
 
 
   
@@ -162,14 +162,14 @@ class MV_on_Vechicle:
             window_width = frame_width // self.lr_window_number
 
             # 前面的frame_height-(frame_height//10 * 2)是為了不要底下雨刷的部份，不要底下的1/5範圍
-            window_height = (frame_height-(frame_height//3)) // self.ud_window_number
+            window_height = (frame_height-int(frame_height//2)) // self.ud_window_number
             window_left = frame_width // 4
             window_right = frame_width // 4 * 3
             # window_left = 0
             # window_right = frame_width
 
             window_bottom = frame_height // 4 * 3
-            window_top = frame_height // 8
+            window_top = frame_height // 4
 
 
             for i in range(self.lr_window_number):
@@ -218,21 +218,21 @@ class MV_on_Vechicle:
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
 
-                    # # 示意框
-                    # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_top + 20], [window_width*i, window_top + 20]]
-                    # polygon = np.array([polygon], dtype=np.int32)
-                    # self.polygon_list.append(polygon)
+                    # 示意框
+                    polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    polygon = np.array([polygon], dtype=np.int32)
+                    self.polygon_list.append(polygon)
 
                 # 橫切 (把上面切掉)
                 for i in range(self.ud_window_number):
                     # 中間
-                    # self.ud_window_list_R.append(u[window_top+window_height*i:window_top+window_height*(i+1), 0:frame_width])
+                    # self.ud_window_list_R.append(u[window_top+window_height*i:window_top+window_height*(i+1), window_left:window_right])
                     # 分成左右
                     self.ud_window_list_R.append(u[window_top+window_height*i:window_top+window_height*(i+1), 0:frame_width//3])
                     self.ud_window_list_L.append(u[window_top+window_height*i:window_top+window_height*(i+1), frame_width//3*2:frame_width])
                     # # 實際偵測範圍
                     # 中間
-                    # polygon = [[1, window_top+window_height*i], [frame_width-1, window_top+window_height*i], [frame_width-1,window_top+ window_height*(i+1)], [1, window_top+window_height*(i+1)]]
+                    # polygon = [[window_left, window_top+window_height*i], [window_right, window_top+window_height*i], [window_right,window_top+ window_height*(i+1)], [window_left, window_top+window_height*(i+1)]]
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
                     # 分成左右
@@ -275,21 +275,24 @@ class MV_on_Vechicle:
 
                 # 畫偵測區域(漸層)
                 yuv_with_polygons = nxt.copy()
-                # for i in range(self.lr_window_number):
-                #     # Calculate blue channel value for gradient
-                #     blue_value = int(255 * (self.lr_window_number - i) / self.lr_window_number + 80)
-                #     red_value = int(255 * i / self.lr_window_number + 80)
-                #     # Draw polygon with calculated color
-                #     color_bgr = (red_value, 30, blue_value)
-                #     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
-                for i in range(len(self.polygon_list)):
+                for i in range(self.lr_window_number):
                     # Calculate blue channel value for gradient
-                    blue_value = int(255 * (self.ud_window_number - i) / self.ud_window_number + 80)
-                    red_value = int(255 * i / self.ud_window_number + 80)
+                    blue_value = int(255 * (self.lr_window_number - i) / self.lr_window_number + 80)
+                    red_value = int(255 * i / self.lr_window_number + 80)
                     # Draw polygon with calculated color
                     color_bgr = (red_value, 30, blue_value)
                     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
 
+                count = 0
+                for i in range(self.lr_window_number, len(self.polygon_list)):
+                    
+                    # Calculate blue channel value for gradient
+                    blue_value = int(255 * (self.ud_window_number - count) / self.ud_window_number + 80)
+                    red_value = int(255 * count / self.ud_window_number + 80)
+                    # Draw polygon with calculated color
+                    color_bgr = (red_value, 30, blue_value)
+                    yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
+                    count+=1
                     
                     
                 
@@ -389,10 +392,10 @@ class MV_on_Vechicle:
 
                     # 畫中心位置
                     self.lr_center_list.append(lr_center_avg)
-                    # cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+8, window_top+10), 6, (31, 198, 0), -1)
+                    cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+8, window_top-30), 6, (31, 198, 0), -1)
                     
                     self.ud_center_list_R.append(ud_center_avg_R)
-                    # self.ud_center_list_L.append(ud_center_avg_L)
+                    self.ud_center_list_L.append(ud_center_avg_L)
                     # # 把上面切掉
                     # cv.circle(yuv_with_polygons, (window_right-10, window_top+window_height*ud_center_avg_R + 15), 6, (255, 0, 0), -1)
                     cv.circle(yuv_with_polygons, (frame_width//2, window_top+window_height*ud_center_avg_L + 15), 6, (0, 0, 255), -1)
