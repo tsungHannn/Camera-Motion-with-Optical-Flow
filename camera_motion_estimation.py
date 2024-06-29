@@ -29,13 +29,13 @@ class MV_on_Vechicle:
         self.threshold = 8000
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0521"
+        self.dir_path = "mvs_mp4\\0318"
         # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
-        self.dir_path = ""
+        # self.dir_path = ""
         # self.all_file = os.listdir(self.dir_path)
-        # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
+        self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
+        # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
         # set parameters for text drawn on the frames
@@ -207,7 +207,8 @@ class MV_on_Vechicle:
 
                 # yolo 偵測
                 yoloPicture = nxt.copy()
-                yoloResult = self.model(yoloPicture)
+                # verbose: Speed: 0.0ms preprocess, 46.9ms inference, 0.0ms postprocess per image at shape (1, 3, 480, 640)
+                yoloResult = self.model(yoloPicture, device="cuda:0", verbose=False)
                 for result in yoloResult:
                     for box in result.boxes:
                         cls = box.cls
