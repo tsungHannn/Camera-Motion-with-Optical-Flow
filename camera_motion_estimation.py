@@ -29,12 +29,13 @@ class MV_on_Vechicle:
         self.threshold = 8000
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\0318"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0318"  # mvclab
-        # self.dir_path = ""
+        # self.dir_path = "mvs_mp4\\0521"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/block"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
-        self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
+        # self.all_file = sorted(self.all_file)
+        # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
+        self.all_file = ["test_2024-07-01-02-55-52_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -71,7 +72,7 @@ class MV_on_Vechicle:
 
 
 
-        self.model = YOLO('yolov8n.pt')
+        self.model = YOLO('yolov8m.pt')
         
     # estimate left or right
     def lr_estimate(self, img):
@@ -90,22 +91,22 @@ class MV_on_Vechicle:
         else:
             return "None"
     
-    # estimate up or down
-    def ud_estimate(self, img):
-        self.threshold = img.shape[0]*img.shape[1]//10
+    # # estimate up or down
+    # def ud_estimate(self, img):
+    #     self.threshold = img.shape[0]*img.shape[1]//10
         
-        translation = np.ravel(img)
+    #     translation = np.ravel(img)
 
-        down_index = np.where(translation < 128)
-        up_index = np.where(translation > 128)
+    #     down_index = np.where(translation < 128)
+    #     up_index = np.where(translation > 128)
 
-        diff = len(down_index[0]) - len(up_index[0])
-        if diff > self.threshold:
-            return 1 # 向下
-        elif diff < -1 * self.threshold:
-            return -1 # 向上
-        else:
-            return "None"
+    #     diff = len(down_index[0]) - len(up_index[0])
+    #     if diff > self.threshold:
+    #         return 1 # 向下
+    #     elif diff < -1 * self.threshold:
+    #         return -1 # 向上
+    #     else:
+    #         return "None"
 
 
     def find_center(self, arr):
@@ -174,7 +175,7 @@ class MV_on_Vechicle:
             # window_right = frame_width
 
             window_bottom = frame_height // 4 * 3
-            window_top = frame_height // 4
+            window_top = frame_height // 3
 
 
             for i in range(self.lr_window_number):
@@ -196,32 +197,32 @@ class MV_on_Vechicle:
                 if not ret:
                     break
                 
-                cv.imshow("before", nxt)
+                # cv.imshow("before", nxt)
+                
                 nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
                 # cv.imshow("after", nxt)
-
+                # cv.imwrite("after.jpg", nxt)
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
                 y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
 
 
                 # yolo 偵測
-                yoloPicture = nxt.copy()
-                # verbose: Speed: 0.0ms preprocess, 46.9ms inference, 0.0ms postprocess per image at shape (1, 3, 480, 640)
-                yoloResult = self.model(yoloPicture, device="cuda:0", verbose=False)
-                for result in yoloResult:
-                    for box in result.boxes:
-                        cls = box.cls
-                        classID = cls.item()
-                        if classID == 2:    # 只處理汽車類別
-                            x1, y1, x2, y2 = box.xyxy[0]
-                            v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
-                            conf = box.conf
-                            cv.rectangle(yoloPicture, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                            cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                cv.imshow("yolo", yoloPicture)
+                yoloPicture = cv.merge((y, y, y))
+                yoloResult = self.model(yoloPicture, verbose=False)
+                # for result in yoloResult:
+                #     for box in result.boxes:
+                #         cls = box.cls
+                #         classID = cls.item()
+                #         if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
+                #             x1, y1, x2, y2 = box.xyxy[0]
+                #             # v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
+                #             conf = box.conf
+                            # cv.rectangle(yoloPicture, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                            # cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                # cv.imshow("yolo", yoloPicture)
                
-
+                # cv.imwrite("yolo.jpg", yoloPicture)
 
                 self.lr_window_list.clear()
                 self.ud_window_list_R.clear()
@@ -235,15 +236,15 @@ class MV_on_Vechicle:
                 for i in range(self.lr_window_number):
                     self.lr_window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
 
-                    # # 實際偵測範圍
-                    # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
-                    # polygon = np.array([polygon], dtype=np.int32)
-                    # self.polygon_list.append(polygon)
-
-                    # 示意框
-                    polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    # 實際偵測範圍
+                    polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
                     polygon = np.array([polygon], dtype=np.int32)
                     self.polygon_list.append(polygon)
+
+                    # # 示意框
+                    # polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
 
                 # # 橫切 (把上面切掉)
                 # for i in range(self.ud_window_number):
@@ -415,7 +416,7 @@ class MV_on_Vechicle:
 
                     # 畫中心位置
                     self.lr_center_list.append(lr_center_avg)
-                    cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+8, window_top-30), 6, (31, 198, 0), -1)
+                    cv.circle(yuv_with_polygons, ((frame_width*lr_center_avg//self.lr_window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
                     
                     # self.ud_center_list_R.append(ud_center_avg_R)
                     # self.ud_center_list_L.append(ud_center_avg_L)
@@ -459,10 +460,23 @@ class MV_on_Vechicle:
                 # u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
                 # v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
 
-                # cv.imshow("polygons", yuv_with_polygons)
-                cv.imshow("y", y)
-                cv.imshow("u", u)
+                # for result in yoloResult:
+                #     for box in result.boxes:
+                #         cls = box.cls
+                #         classID = cls.item()
+                #         if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
+                #             x1, y1, x2, y2 = box.xyxy[0]
+                #             # v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
+                #             conf = box.conf
+                #             cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                #             cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+                cv.imshow("polygons", yuv_with_polygons)
+
+                # cv.imshow("y", y)
+                # cv.imshow("u", u)
                 cv.imshow("v", v)
+                cv.imwrite("polygons.jpg", yuv_with_polygons)
                 # for i in range(self.window_number):
                 #     cv.imshow(str(i), self.lr_window_list[i])
 
@@ -470,7 +484,6 @@ class MV_on_Vechicle:
                     break
                 
                 outputStream.write(yuv_with_polygons)
-                
 
                 frame_id += 1
 

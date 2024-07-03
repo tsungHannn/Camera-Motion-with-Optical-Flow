@@ -7,4 +7,5 @@ result/
 mvs_mp4
 *.mp4
 save/
-yolov8n.pt
+*.pt
+*.jpg
