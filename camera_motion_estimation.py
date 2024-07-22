@@ -30,12 +30,12 @@ class MV_on_Vechicle:
 
 		# specify directory and file name
         # self.dir_path = "mvs_mp4\\0521"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/block"  # mvclab
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-55-52_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-28-03_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -236,15 +236,15 @@ class MV_on_Vechicle:
                 for i in range(self.lr_window_number):
                     self.lr_window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
 
-                    # 實際偵測範圍
-                    polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
-                    polygon = np.array([polygon], dtype=np.int32)
-                    self.polygon_list.append(polygon)
-
-                    # # 示意框
-                    # polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    # # 實際偵測範圍
+                    # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
                     # polygon = np.array([polygon], dtype=np.int32)
                     # self.polygon_list.append(polygon)
+
+                    # 示意框
+                    polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    polygon = np.array([polygon], dtype=np.int32)
+                    self.polygon_list.append(polygon)
 
                 # # 橫切 (把上面切掉)
                 # for i in range(self.ud_window_number):
@@ -476,14 +476,15 @@ class MV_on_Vechicle:
                 # cv.imshow("y", y)
                 # cv.imshow("u", u)
                 cv.imshow("v", v)
-                cv.imwrite("polygons.jpg", yuv_with_polygons)
+                # cv.imwrite("polygons.jpg", yuv_with_polygons)
                 # for i in range(self.window_number):
                 #     cv.imshow(str(i), self.lr_window_list[i])
 
-                if cv.waitKey(25) & 0xFF == ord('q'):
-                    break
+                # if cv.waitKey(25) & 0xFF == ord('q'):
+                #     break
                 
-                outputStream.write(yuv_with_polygons)
+                outputV = cv.merge((v,v,v))
+                outputStream.write(outputV)
 
                 frame_id += 1
 
