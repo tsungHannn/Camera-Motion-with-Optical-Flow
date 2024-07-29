@@ -21,29 +21,29 @@ class KalmanFilter:
     def __init__(self, process_variance, measurement_variance, estimated_measurement_variance):
         # 過程噪聲：該參數描述了系統本身的不確定性，也就是模型預測的噪聲大小。
         # 如果設置較高的過程噪聲方差，濾波器會更相信觀測值
-        self.process_variance = process_variance
+        self.process_variance = process_variance # 4
 
         # 測量噪聲：該參數描述了觀測值的不確定性，也就是測量噪聲的大小。
         # 如果測量噪聲方差較大，濾波器會對測量數據的信任度降低，更依賴於模型的預測，這可能使濾波器的響應更平滑，但對觀測數據的突然變化不敏感。
-        self.measurement_variance = measurement_variance
+        self.measurement_variance = measurement_variance # 3
 
         # 估計的測量誤差協方差:設定了濾波器開始運行時的初始狀態不確定性。
         # 初始值設置為較大時，濾波器會在初始幾步中迅速調整，以更快地收斂到正確的值。
-        self.estimated_measurement_variance = estimated_measurement_variance
+        self.estimated_measurement_variance = estimated_measurement_variance # 1
         
         # 後驗狀態估計
-        self.posteri_estimate = 0.0
+        self.posteri_estimate = 20
         # 後驗誤差協方差
         self.posteri_error_covariance = 1.0
 
     def update(self, measurement):
         # 預測階段
-        priori_estimate = self.posteri_estimate
-        priori_error_covariance = self.posteri_error_covariance + self.process_variance
+        priori_estimate = self.posteri_estimate # 20
+        priori_error_covariance = self.posteri_error_covariance + self.process_variance # 5
 
         # 更新階段
-        kalman_gain = priori_error_covariance / (priori_error_covariance + self.measurement_variance)
-        self.posteri_estimate = priori_estimate + kalman_gain * (measurement - priori_estimate)
+        kalman_gain = priori_error_covariance / (priori_error_covariance + self.measurement_variance) # 0.625
+        self.posteri_estimate = priori_estimate + kalman_gain * (measurement - priori_estimate) # 20.625
         self.posteri_error_covariance = (1 - kalman_gain) * priori_error_covariance
 
         return self.posteri_estimate
@@ -72,7 +72,7 @@ class MV_on_Vechicle:
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-35-07_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-29-45_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -328,6 +328,27 @@ class MV_on_Vechicle:
                 self.lr_center_without_avg_list.append(lr_center)
 
 
+
+                # # Kalman Filter
+                # measurement = self.lr_center_without_avg_list[-1]
+
+                # kf = KalmanFilter(process_variance=5, measurement_variance=0.5, estimated_measurement_variance=1.0)
+                # # 使用卡爾曼濾波器更新並獲取當前估計的中心位置
+                # lr_center_kalman = kf.update(measurement)
+
+                # # 繪製中心位置
+                # self.lr_center_list.append(int(lr_center_kalman))
+                # cv.circle(
+                #     yuv_with_polygons,
+                #     (
+                #         (self.frame_width * int(lr_center_kalman) // self.lr_window_number) + (window_width // 2),
+                #         window_top - 30,
+                #     ),
+                #     6,
+                #     (31, 198, 0),
+                #     -1,
+                # )
+
                 # 20 幀後才開始算
                 if len(self.lr_center_without_avg_list) >= 20:
                     lr_center_sum = 0
@@ -387,8 +408,8 @@ class MV_on_Vechicle:
                 # cv.imshow("y", y)
                 # cv.imshow("u", u)
                 cv.imshow("v", v)
-                cv.imwrite("gray.jpg", y)
-                cv.imwrite("v.jpg", v)
+                # cv.imwrite("gray.jpg", y)
+                # cv.imwrite("v.jpg", v)
                 # cv.imwrite("polygons.jpg", yuv_with_polygons)
                 # for i in range(self.window_number):
                 #     cv.imshow(str(i), self.lr_window_list[i])
@@ -401,7 +422,7 @@ class MV_on_Vechicle:
                 #     break
                 
                 outputV = cv.merge((v,v,v))
-                outputStream.write(yoloPicture)
+                outputStream.write(yuv_with_polygons)
 
                 frame_id += 1
 
