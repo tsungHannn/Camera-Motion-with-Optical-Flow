@@ -269,7 +269,7 @@ class RosVideoWriter():
                             mat = np.reshape(np_arr, (480,640,2))
                             cv_image = cv2.cvtColor(mat, cv2.COLOR_YUV2BGR_UYVY)
                             msg.data = cv_image.tostring()
-                            pix_fmt = 'bgr24'
+                            pix_fmt = 'yuv422'
                         else:
                             print('unsupported encoding:', msg.encoding, topic)
                             #exit(1)

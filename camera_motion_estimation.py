@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from matplotlib import pyplot as plt
 import yaml
 from ultralytics import YOLO
+from utils import KalmanFilter
 """
 MVS 資料格式：
 輸出為640*480 YUV422, 其中
@@ -14,41 +15,6 @@ U: 水平向量(320*480)  U > 128:向左   U < 128:向右
 V: 垂直向量(320*480)  V > 128:向上   V < 128:向下
 
 """
-
-
-# 初始化卡爾曼濾波器的變量
-class KalmanFilter:
-    def __init__(self, process_variance, measurement_variance, estimated_measurement_variance):
-        # 過程噪聲：該參數描述了系統本身的不確定性，也就是模型預測的噪聲大小。
-        # 如果設置較高的過程噪聲方差，濾波器會更相信觀測值
-        self.process_variance = process_variance # 4
-
-        # 測量噪聲：該參數描述了觀測值的不確定性，也就是測量噪聲的大小。
-        # 如果測量噪聲方差較大，濾波器會對測量數據的信任度降低，更依賴於模型的預測，這可能使濾波器的響應更平滑，但對觀測數據的突然變化不敏感。
-        self.measurement_variance = measurement_variance # 3
-
-        # 估計的測量誤差協方差:設定了濾波器開始運行時的初始狀態不確定性。
-        # 初始值設置為較大時，濾波器會在初始幾步中迅速調整，以更快地收斂到正確的值。
-        self.estimated_measurement_variance = estimated_measurement_variance # 1
-        
-        # 後驗狀態估計
-        self.posteri_estimate = 20
-        # 後驗誤差協方差
-        self.posteri_error_covariance = 1.0
-
-    def update(self, measurement):
-        # 預測階段
-        priori_estimate = self.posteri_estimate # 20
-        priori_error_covariance = self.posteri_error_covariance + self.process_variance # 5
-
-        # 更新階段
-        kalman_gain = priori_error_covariance / (priori_error_covariance + self.measurement_variance) # 0.625
-        self.posteri_estimate = priori_estimate + kalman_gain * (measurement - priori_estimate) # 20.625
-        self.posteri_error_covariance = (1 - kalman_gain) * priori_error_covariance
-
-        return self.posteri_estimate
-
-
 
 class MV_on_Vechicle:
     def __init__(self):
@@ -68,11 +34,11 @@ class MV_on_Vechicle:
 		# specify directory and file name
         # self.dir_path = "mvs_mp4\\0521"
         self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
-        # self.all_file = os.listdir(self.dir_path)
+        self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-29-45_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -145,6 +111,8 @@ class MV_on_Vechicle:
 
         return best_index
     
+    # 判斷偵測框內的 MV 是否正在超車
+    # 輸入整張圖片及偵測框對角點
     def is_overtake(self, img, x1, y1, x2, y2):
         det_center = (x1+x2) // 2
         box = img[int(y1):int(y2), int(x1):int(x2)]
@@ -166,8 +134,26 @@ class MV_on_Vechicle:
             else:
                 return False
 
+    # 讀取 x 軸向量，若在正常直走時有雜點就消除
+    # 會修改 v 的值
+    def filter_overtake(self, img):
+        middle_index = self.frame_width // 2
 
-    def run_split_window(self):
+        # 左半部分處理
+        left_half = img[:, :middle_index]
+        left_half[left_half < 128] = 128
+
+        # 右半部分處理
+        right_half = img[:, middle_index:]
+        right_half[right_half > 128] = 128
+
+        # 合併處理後的圖像
+        processed_image_array = np.hstack((left_half, right_half))
+
+        return processed_image_array
+
+
+    def run(self):
         for file in self.all_file:
             filename = file
 
@@ -212,7 +198,29 @@ class MV_on_Vechicle:
             for i in range(self.lr_window_number):
                 self.lr_last_state.append("")
                 self.lr_window_result.append([])
-                
+            
+
+            # stateMatrix = np.expand_dims(np.array([320, 240], dtype=np.float32), axis=1)  # [x, y, mv_x, mv_y]
+            stateMatrix = np.array([[20.0]], dtype=np.float32)
+
+            estimateCovariance = np.array([[1.0]], dtype=np.float32)
+            transitionMatrix = np.array([[1.0]], dtype=np.float32)
+            processNoiseCov = np.array([[0.01]], dtype=np.float32)
+
+            # measurementStateMatrix = np.zeros((2, 1), np.float32)
+            measurementStateMatrix = np.array([[0.0]], dtype=np.float32)
+
+            observationMatrix = np.array([[1.0]], dtype=np.float32)
+            measurementNoiseCov = np.array([[3.0]], dtype=np.float32)
+
+            kf = KalmanFilter(X=stateMatrix,
+                    P=estimateCovariance,
+                    F=transitionMatrix,
+                    Q=processNoiseCov,
+                    Z=measurementStateMatrix,
+                    H=observationMatrix,
+                    R=measurementNoiseCov)
+            
             # main loop
             while True:
                 # read a new frame
@@ -235,42 +243,48 @@ class MV_on_Vechicle:
 
                 yuv_with_polygons = nxt.copy()
 
-                # 如果目前在轉彎，則不要進行物件偵測輔助
-                if len(self.lr_center_list) > 20:
-                    if self.lr_center_list[-1] < self.lr_window_number//4 or self.lr_center_list[-1] > self.lr_window_number//4*3:
-                        cv.circle(yuv_with_polygons, (10,10), 10, (0, 0, 255), -1)
-                        self.is_detect = False
-                    else:
-                        cv.circle(yuv_with_polygons, (10,10), 10, (0, 255, 0), -1)
-                        self.is_detect = True
-                self.is_detect = True
+                # # 如果目前在轉彎，則不要進行物件偵測輔助
+                # if len(self.lr_center_list) > 20:
+                #     if self.lr_center_list[-1] < self.lr_window_number//4 or self.lr_center_list[-1] > self.lr_window_number//4*3:
+                #         cv.circle(yuv_with_polygons, (10,10), 10, (0, 0, 255), -1)
+                #         self.is_detect = False
+                #     else:
+                #         cv.circle(yuv_with_polygons, (10,10), 10, (0, 255, 0), -1)
+                #         self.is_detect = True
+                # self.is_detect = True
 
-                # yolo 偵測
-                yoloPicture = cv.merge((y, y, y))
-                yoloResult = self.model(yoloPicture, verbose=False)
-                for result in yoloResult:
-                    for box in result.boxes:
-                        cls = box.cls
-                        classID = cls.item()
-                        if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
-                            x1, y1, x2, y2 = box.xyxy[0]
-                            if self.is_detect:
-                                if self.is_overtake(v, x1, y1, x2, y2):
-                                    v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
-                                    conf = box.conf
-                                    cv.rectangle(yoloPicture, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                                    cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                                else:
-                                    conf = box.conf
-                                    cv.rectangle(yoloPicture, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                                    cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                            else:
-                                conf = box.conf
-                                cv.rectangle(yoloPicture, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                                cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                cv.imshow("yolo", yoloPicture)
+                # # yolo 偵測
+                # yoloPicture = cv.merge((y, y, y))
+                # yoloResult = self.model(yoloPicture, verbose=False)
+                # for result in yoloResult:
+                #     for box in result.boxes:
+                #         cls = box.cls
+                #         classID = cls.item()
+                #         if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
+                #             x1, y1, x2, y2 = box.xyxy[0]
+                #             if self.is_detect:
+                #                 if self.is_overtake(v, x1, y1, x2, y2):
+                #                     v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
+                #                     conf = box.conf
+                #                     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                #                     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                #                 else:
+                #                     conf = box.conf
+                #                     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                #                     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                #             else:
+                #                 conf = box.conf
+                #                 cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                #                 cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                # cv.imshow("yolo", yoloPicture)
 
                 # cv.imwrite("yolo.jpg", yoloPicture)
+
+
+                # x 軸向量前處理
+                testV = self.filter_overtake(v.copy())
+                cv.imshow("testV", testV)
+
 
                 self.lr_window_list.clear()
                 self.polygon_list.clear()
@@ -329,25 +343,11 @@ class MV_on_Vechicle:
 
 
 
-                # # Kalman Filter
-                # measurement = self.lr_center_without_avg_list[-1]
-
-                # kf = KalmanFilter(process_variance=5, measurement_variance=0.5, estimated_measurement_variance=1.0)
-                # # 使用卡爾曼濾波器更新並獲取當前估計的中心位置
-                # lr_center_kalman = kf.update(measurement)
-
-                # # 繪製中心位置
-                # self.lr_center_list.append(int(lr_center_kalman))
-                # cv.circle(
-                #     yuv_with_polygons,
-                #     (
-                #         (self.frame_width * int(lr_center_kalman) // self.lr_window_number) + (window_width // 2),
-                #         window_top - 30,
-                #     ),
-                #     6,
-                #     (31, 198, 0),
-                #     -1,
-                # )
+                # # # Kalman Filter
+                # current_measurement = np.array([[lr_center]], dtype=np.float32)
+                # current_prediction = kf.predict()
+                # corrected_state = int(kf.correct(current_measurement))
+                # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.lr_window_number)+(window_width//2), window_top-30), 6, (0,0,255), -1)
 
                 # 20 幀後才開始算
                 if len(self.lr_center_without_avg_list) >= 20:
@@ -386,7 +386,7 @@ class MV_on_Vechicle:
                 # cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
                 cv.putText(yuv_with_polygons, str(frame_id), (610, 20), self.font, 0.5, (0, 0, 255), 1)
 
-                # y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
+                y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 # u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
                 # v = cv.cvtColor(v, cv.COLOR_GRAY2BGR)
 
@@ -415,13 +415,13 @@ class MV_on_Vechicle:
                 #     cv.imshow(str(i), self.lr_window_list[i])
 
 
-                if cv.waitKey(25) & 0xFF == ord('q'):
-                    break
-                # 不用 YOLO 偵測的話會跑太快
-                # if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
+                # if cv.waitKey(25) & 0xFF == ord('q'):
                 #     break
+                # 不用 YOLO 偵測的話會跑太快
+                if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
+                    break
                 
-                outputV = cv.merge((v,v,v))
+                # outputV = cv.merge((v,v,v))
                 outputStream.write(yuv_with_polygons)
 
                 frame_id += 1
@@ -434,7 +434,7 @@ class MV_on_Vechicle:
 if __name__ == "__main__":
 
     detector = MV_on_Vechicle()
-    detector.run_split_window()
+    detector.run()
     # plt.cla()
 
     # plt.plot()
