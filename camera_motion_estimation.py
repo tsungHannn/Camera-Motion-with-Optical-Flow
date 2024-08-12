@@ -25,7 +25,7 @@ class MV_on_Vechicle:
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
-        self.lr_window_number = 40
+        self.window_number = 40
         self.threshold = 8000
         self.frame_width = 640
         self.frame_height = 480
@@ -34,11 +34,11 @@ class MV_on_Vechicle:
 		# specify directory and file name
         # self.dir_path = "mvs_mp4\\0521"
         self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
-        self.all_file = os.listdir(self.dir_path)
+        # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-28-03_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -52,14 +52,20 @@ class MV_on_Vechicle:
         self.leaning_right = 24
         self.leaning_left = 16
 
-        self.lr_window_list = [] # 存每個window(左右)
-        self.lr_window_state = [] # 每個window的區域結果
+        self.window_list = [] # 存每個window(左右)
+        self.yolo_window_list = []
+        self.window_state = [] # 每個window的區域結果
+        self.yolo_window_state = []
         self.polygon_list = [] # 畫每個window的範圍
-        self.lr_window_result = [] # 存每個window的結果
+        self.window_result = [] # 存每個window的結果
+        self.yolo_window_result = []
         self.record = []
-        self.lr_last_state = [] # 方向點數量沒超過閥值的話就使用上一次的結果
-        self.lr_center_list = [] # 紀錄中央點，畫圖用
-        self.lr_center_without_avg_list = []
+        self.last_state = [] # 方向點數量沒超過閥值的話就使用上一次的結果
+        self.yolo_last_state = []
+        self.center_list = [] # 紀錄中央點，畫圖用
+        self.yolo_center_list = []
+        self.center_without_avg_list = []
+        self.yolo_cener_without_avg_list = []
 
         self.is_detect = True # 轉彎時不進行物件偵測
 
@@ -69,7 +75,7 @@ class MV_on_Vechicle:
         
     # estimate left or right
     def lr_estimate(self, img):
-        self.threshold = img.shape[0]*img.shape[1]//3
+        self.threshold = img.shape[0]*img.shape[1]//5
         
         translation = np.ravel(img) # 把img變為一維
 
@@ -116,19 +122,19 @@ class MV_on_Vechicle:
     def is_overtake(self, img, x1, y1, x2, y2):
         det_center = (x1+x2) // 2
         box = img[int(y1):int(y2), int(x1):int(x2)]
-        threshold = box.shape[0]*box.shape[1] // 10
+        threshold = box.shape[0]*box.shape[1] // 15
 
         translation = np.ravel(box) # 把img變為一維
         right_index = np.where(translation < 128)
         left_index = np.where(translation > 128)
         diff = len(right_index[0]) - len(left_index[0])
 
-        if det_center < self.frame_width // 3:  # 框框在整個畫面的左邊
+        if det_center < self.frame_width // 4:  # 框框在整個畫面的左邊
             if diff > threshold:    # 框框在左邊，而且框框內的mv值往右 -> 框框內的車是超車
                 return True
             else:
                 return False
-        elif det_center > self.frame_width // 3 * 2:    # 框框在整個畫面的右邊
+        elif det_center > self.frame_width // 4*3:    # 框框在整個畫面的右邊
             if diff < -1 * threshold:    # 框框在右邊，而且框框內的mv值往左
                 return True
             else:
@@ -161,7 +167,7 @@ class MV_on_Vechicle:
             # initialise stream from video
             cap = cv.VideoCapture(os.path.join(self.dir_path, filename))
             # cap = cv.VideoCapture(filename)
-
+            print("-"*20)
             print(os.path.join(self.dir_path, filename))
             print(cap.isOpened())
             ret, prvs = cap.read()
@@ -182,7 +188,7 @@ class MV_on_Vechicle:
             frame_id = 0
             self.frame_width = int(cap.get(3))
             self.frame_height = int(cap.get(4))
-            window_width = self.frame_width // self.lr_window_number
+            window_width = self.frame_width // self.window_number
 
             # 前面的frame_height-(frame_height//10 * 2)是為了不要底下雨刷的部份，不要底下的1/5範圍
             # window_height = (frame_height-int(frame_height//2)) // self.ud_window_number
@@ -191,29 +197,36 @@ class MV_on_Vechicle:
             # window_left = 0
             # window_right = frame_width
 
-            window_bottom = self.frame_height // 4 * 3
-            window_top = self.frame_height // 3
+            window_bottom = self.frame_height // 5 * 4
+            window_top = self.frame_height // 5
 
 
-            for i in range(self.lr_window_number):
-                self.lr_last_state.append("")
-                self.lr_window_result.append([])
+            for i in range(self.window_number):
+                self.last_state.append("")
+                self.window_result.append([])
+                self.yolo_last_state.append("")
+                self.yolo_window_result.append([])
             
 
-            # stateMatrix = np.expand_dims(np.array([320, 240], dtype=np.float32), axis=1)  # [x, y, mv_x, mv_y]
             stateMatrix = np.array([[20.0]], dtype=np.float32)
 
             estimateCovariance = np.array([[1.0]], dtype=np.float32)
             transitionMatrix = np.array([[1.0]], dtype=np.float32)
             processNoiseCov = np.array([[0.01]], dtype=np.float32)
 
-            # measurementStateMatrix = np.zeros((2, 1), np.float32)
             measurementStateMatrix = np.array([[0.0]], dtype=np.float32)
 
             observationMatrix = np.array([[1.0]], dtype=np.float32)
             measurementNoiseCov = np.array([[3.0]], dtype=np.float32)
 
-            kf = KalmanFilter(X=stateMatrix,
+            kf1 = KalmanFilter(X=stateMatrix,
+                    P=estimateCovariance,
+                    F=transitionMatrix,
+                    Q=processNoiseCov,
+                    Z=measurementStateMatrix,
+                    H=observationMatrix,
+                    R=measurementNoiseCov)
+            kf2 = KalmanFilter(X=stateMatrix,
                     P=estimateCovariance,
                     F=transitionMatrix,
                     Q=processNoiseCov,
@@ -244,56 +257,60 @@ class MV_on_Vechicle:
                 yuv_with_polygons = nxt.copy()
 
                 # # 如果目前在轉彎，則不要進行物件偵測輔助
-                # if len(self.lr_center_list) > 20:
-                #     if self.lr_center_list[-1] < self.lr_window_number//4 or self.lr_center_list[-1] > self.lr_window_number//4*3:
+                # if len(self.center_list) > 20:
+                #     if self.center_list[-1] < self.window_number//4 or self.center_list[-1] > self.window_number//4*3:
                 #         cv.circle(yuv_with_polygons, (10,10), 10, (0, 0, 255), -1)
                 #         self.is_detect = False
                 #     else:
                 #         cv.circle(yuv_with_polygons, (10,10), 10, (0, 255, 0), -1)
                 #         self.is_detect = True
-                # self.is_detect = True
+                # # self.is_detect = True
 
-                # # yolo 偵測
-                # yoloPicture = cv.merge((y, y, y))
-                # yoloResult = self.model(yoloPicture, verbose=False)
-                # for result in yoloResult:
-                #     for box in result.boxes:
-                #         cls = box.cls
-                #         classID = cls.item()
-                #         if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
-                #             x1, y1, x2, y2 = box.xyxy[0]
-                #             if self.is_detect:
-                #                 if self.is_overtake(v, x1, y1, x2, y2):
-                #                     v[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
-                #                     conf = box.conf
-                #                     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                #                     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                #                 else:
-                #                     conf = box.conf
-                #                     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                #                     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                #             else:
-                #                 conf = box.conf
-                #                 cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                #                 cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                # cv.imshow("yolo", yoloPicture)
+                # yolo 偵測
+                yoloPicture = cv.merge((y, y, y))
+                yoloV = v.copy()
+                yoloResult = self.model(yoloPicture, verbose=False)
+                for result in yoloResult:
+                    for box in result.boxes:
+                        cls = box.cls
+                        classID = cls.item()
+                        if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
+                            x1, y1, x2, y2 = box.xyxy[0]
+                            if self.is_detect:
+                                if self.is_overtake(yoloV, x1, y1, x2, y2):
+                                    yoloV[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
+                                    # conf = box.conf
+                                    cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                                    # cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                                # else:
+                                #     conf = box.conf
+                                #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                                #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                            # else:
+                            #     conf = box.conf
+                            #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                            #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                cv.imshow("yolo", yoloV)
 
                 # cv.imwrite("yolo.jpg", yoloPicture)
 
 
-                # x 軸向量前處理
-                testV = self.filter_overtake(v.copy())
-                cv.imshow("testV", testV)
+                # # x 軸向量前處理
+                # testV = self.filter_overtake(v.copy())
+                # cv.imshow("testV", testV)
 
 
-                self.lr_window_list.clear()
+                self.window_list.clear()
+                self.yolo_window_list.clear()
                 self.polygon_list.clear()
-                self.lr_window_state.clear()
+                self.window_state.clear()
+                self.yolo_window_state.clear()
 
                 # 直切
-                for i in range(self.lr_window_number):
-                    self.lr_window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
-
+                for i in range(self.window_number):
+                    self.window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    self.yolo_window_list.append(yoloV[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    
                     # # 實際偵測範圍
                     # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
                     # polygon = np.array([polygon], dtype=np.int32)
@@ -306,62 +323,106 @@ class MV_on_Vechicle:
 
 
                 # 畫偵測區域(漸層)
-                for i in range(self.lr_window_number):
+                for i in range(self.window_number):
                     # Calculate blue channel value for gradient
-                    blue_value = int(255 * (self.lr_window_number - i) / self.lr_window_number + 80)
-                    red_value = int(255 * i / self.lr_window_number + 80)
+                    blue_value = int(255 * (self.window_number - i) / self.window_number + 80)
+                    red_value = int(255 * i / self.window_number + 80)
                     # Draw polygon with calculated color
                     color_bgr = (red_value, 30, blue_value)
                     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
-
-
-                # 儲存每個window的區域結果(左右)
-                for i in range(self.lr_window_number):
-                    tempAns_R = self.lr_estimate(self.lr_window_list[i])
-                    if(tempAns_R == "None"):
-                        self.lr_window_state.append(self.lr_last_state[i])
-                    if(tempAns_R != "None"):
-                        self.lr_last_state[i] = tempAns_R
-                        self.lr_window_state.append(tempAns_R)
-                    
-
-                # 畫上每個區域結果(左右)
-                lr_tempRow = []
-                for i in range(self.lr_window_number):
-                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
-                    if(self.lr_window_state[i] == ""):
-                        self.lr_window_result[i].append(0)
-                        lr_tempRow.append(0)
-                    else:
-                        self.lr_window_result[i].append(int(self.lr_window_state[i]))
-                        lr_tempRow.append(int(self.lr_window_state[i]))
                 
 
 
-                lr_center = self.find_center(lr_tempRow)
-                self.lr_center_without_avg_list.append(lr_center)
 
+                # 如果左右點差距小於閥值，就使用上一次的結果
+                for i in range(self.window_number):
+                    tempAns = self.lr_estimate(self.window_list[i])
+                    yolo_tempAns = self.lr_estimate(self.yolo_window_list[i])
+
+                    if(tempAns == "None"):
+                        self.window_state.append(self.last_state[i])
+                    if(tempAns != "None"):
+                        self.last_state[i] = tempAns
+                        self.window_state.append(tempAns)
+                    
+                    if(yolo_tempAns == "None"):
+                        self.yolo_window_state.append(self.yolo_last_state[i])
+                    if(yolo_tempAns != "None"):
+                        self.yolo_last_state[i] = yolo_tempAns
+                        self.yolo_window_state.append(yolo_tempAns)
+                    
+                    
+
+                # 儲存每個window的結果
+                tempRow = []
+                for i in range(self.window_number):
+                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
+                    if(self.window_state[i] == ""):
+                        self.window_result[i].append(0)
+                        tempRow.append(0)
+                    else:
+                        self.window_result[i].append(int(self.window_state[i]))
+                        tempRow.append(int(self.window_state[i]))
+                
+                # 儲存每個window的結果
+                yolo_tempRow = []
+                for i in range(self.window_number):
+                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
+                    if(self.yolo_window_state[i] == ""):
+                        self.yolo_window_result[i].append(0)
+                        yolo_tempRow.append(0)
+                    else:
+                        self.yolo_window_result[i].append(int(self.yolo_window_state[i]))
+                        yolo_tempRow.append(int(self.yolo_window_state[i]))
+
+
+                lr_center = self.find_center(tempRow)
+                self.center_without_avg_list.append(lr_center)
+
+                yolo_lr_center = self.find_center(yolo_tempRow)
+                self.yolo_cener_without_avg_list.append(yolo_lr_center)
 
 
                 # # # Kalman Filter
                 # current_measurement = np.array([[lr_center]], dtype=np.float32)
-                # current_prediction = kf.predict()
-                # corrected_state = int(kf.correct(current_measurement))
-                # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.lr_window_number)+(window_width//2), window_top-30), 6, (0,0,255), -1)
+                # current_prediction = kf2.predict()
+                # corrected_state = int(kf2.correct(current_measurement))
+                # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-30), 6, (31,198,0), -1)
 
+                # current_measurement = np.array([[yolo_lr_center]], dtype=np.float32)
+                # current_prediction = kf1.predict()
+                # corrected_state = int(kf1.correct(current_measurement))
+                # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-50), 6, (0,0,255), -1)
+                
+                
                 # 20 幀後才開始算
-                if len(self.lr_center_without_avg_list) >= 20:
-                    lr_center_sum = 0
+                if len(self.center_without_avg_list) >= 20:
+                    center_sum = 0
+                    yolo_center_sum = 0
 
                     for i in range(1, 21):
-                        lr_center_sum += self.lr_center_without_avg_list[-i]
+                        center_sum += self.center_without_avg_list[-i]
+                        yolo_center_sum += self.yolo_cener_without_avg_list[-i]
 
-                    lr_center_avg = int(lr_center_sum / 20)
+                    center_avg = int(center_sum / 20)
+                    yolo_center_avg = int(yolo_center_sum / 20)
+
+                    # # 畫中心位置
+                    self.center_list.append(center_avg)
+                    cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
                     # 畫中心位置
-                    self.lr_center_list.append(lr_center_avg)
-                    cv.circle(yuv_with_polygons, ((self.frame_width*lr_center_avg//self.lr_window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
+                    self.yolo_center_list.append(yolo_center_avg)
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
+
+
+                    # # # 移動平均 + Kalman Filter
+                    # current_measurement = np.array([[lr_center_avg]], dtype=np.float32)
+                    # current_prediction = kf1.predict()
+                    # corrected_state = int(kf1.correct(current_measurement))
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.lr_window_number)+(window_width//2), window_top-70), 6, (255,0,0), -1)
 
                     # if center_avg == 0:
                     #     motion_list.append("Left")
@@ -374,7 +435,8 @@ class MV_on_Vechicle:
                     # elif center_avg > self.leaning_right:
                     #     motion_list.append("Leaning right")
                 else:
-                    self.lr_center_list.append(0) # 為了畫圖合理，前面20幀沒有數據補0
+                    self.center_list.append(0) # 為了畫圖合理，前面20幀沒有數據補0
+                    self.yolo_center_list.append(0)
 
 
                     
@@ -409,8 +471,8 @@ class MV_on_Vechicle:
                 # cv.imshow("u", u)
                 cv.imshow("v", v)
                 # cv.imwrite("gray.jpg", y)
-                # cv.imwrite("v.jpg", v)
-                # cv.imwrite("polygons.jpg", yuv_with_polygons)
+                cv.imwrite("v.jpg", v)
+                cv.imwrite("polygons.jpg", yuv_with_polygons)
                 # for i in range(self.window_number):
                 #     cv.imshow(str(i), self.lr_window_list[i])
 
