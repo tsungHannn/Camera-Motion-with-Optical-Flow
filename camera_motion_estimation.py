@@ -38,7 +38,7 @@ class MV_on_Vechicle:
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-28-03_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -75,7 +75,7 @@ class MV_on_Vechicle:
         
     # estimate left or right
     def lr_estimate(self, img):
-        self.threshold = img.shape[0]*img.shape[1]//5
+        self.threshold = img.shape[0]*img.shape[1]//3
         
         translation = np.ravel(img) # 把img變為一維
 
@@ -176,8 +176,8 @@ class MV_on_Vechicle:
             frameRate = int(cap.get(cv.CAP_PROP_FPS))
             codec = cv.VideoWriter_fourcc(*'mp4v')
             save_name = "motion_" + filename[:-4] + ".mp4"
-            outputStream = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-
+            outputStream1 = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+            outputStream2 = cv.VideoWriter("save.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
 
 
             # initialise text variables to draw on frames
@@ -266,31 +266,31 @@ class MV_on_Vechicle:
                 #         self.is_detect = True
                 # # self.is_detect = True
 
-                # yolo 偵測
+                # # yolo 偵測
                 yoloPicture = cv.merge((y, y, y))
                 yoloV = v.copy()
-                yoloResult = self.model(yoloPicture, verbose=False)
-                for result in yoloResult:
-                    for box in result.boxes:
-                        cls = box.cls
-                        classID = cls.item()
-                        if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
-                            x1, y1, x2, y2 = box.xyxy[0]
-                            if self.is_detect:
-                                if self.is_overtake(yoloV, x1, y1, x2, y2):
-                                    yoloV[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
-                                    # conf = box.conf
-                                    cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
-                                    # cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                                # else:
-                                #     conf = box.conf
-                                #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                                #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                            # else:
-                            #     conf = box.conf
-                            #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
-                            #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                cv.imshow("yolo", yoloV)
+                # yoloResult = self.model(yoloPicture, verbose=False)
+                # for result in yoloResult:
+                #     for box in result.boxes:
+                #         cls = box.cls
+                #         classID = cls.item()
+                #         if classID == 2  or classID==3 or classID == 0 or classID == 7:    # 2:car; 3:motorcycle; 5:bus; 7:truck
+                #             x1, y1, x2, y2 = box.xyxy[0]
+                #             if self.is_detect:
+                #                 if self.is_overtake(yoloV, x1, y1, x2, y2):
+                #                     yoloV[int(y1):int(y2), int(x1):int(x2)] = 128   # 偵測框內的MV值不計算 (128是沒有向量)
+                #                     # conf = box.conf
+                #                     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 0, 255), 2)
+                #                     # cv.putText(yoloPicture, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                #                 # else:
+                #                 #     conf = box.conf
+                #                 #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                #                 #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                #             # else:
+                #             #     conf = box.conf
+                #             #     cv.rectangle(yuv_with_polygons, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+                #             #     cv.putText(yuv_with_polygons, f'{self.model.names[int(cls.item())]} {conf.item():.2f}', (int(x1), int(y1)-10), cv.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                # cv.imshow("yolo", yoloV)
 
                 # cv.imwrite("yolo.jpg", yoloPicture)
 
@@ -409,12 +409,12 @@ class MV_on_Vechicle:
 
                     # # 畫中心位置
                     self.center_list.append(center_avg)
-                    cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
                     # 畫中心位置
                     self.yolo_center_list.append(yolo_center_avg)
                     # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
-                    # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
+                    cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
 
 
@@ -483,13 +483,16 @@ class MV_on_Vechicle:
                 if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
                     break
                 
-                # outputV = cv.merge((v,v,v))
-                outputStream.write(yuv_with_polygons)
+                outputV = cv.merge((v,v,v))
+                outputStream1.write(yuv_with_polygons)
+                outputStream2.write(outputV)
+
 
                 frame_id += 1
 
 
-            outputStream.release()
+            outputStream1.release()
+            outputStream2.release()
 
 
 
