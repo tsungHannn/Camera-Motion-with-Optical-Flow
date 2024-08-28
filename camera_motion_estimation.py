@@ -42,13 +42,13 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0521"
+        # self.dir_path = "mvs_mp4\\0701\\edge"
         self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-44-14_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -316,6 +316,7 @@ class MV_on_Vechicle:
 
             u_plot1 = []
             u_plot2 = []
+            plt.ion()
 
             # main loop 
             while True:
@@ -335,14 +336,14 @@ class MV_on_Vechicle:
                 y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
 
 
-                translation = np.ravel(u.copy())
-                up = np.where(translation > 128)
-                down = np.where(translation < 128)
+                # translation = np.ravel(u.copy())
+                # up = np.where(translation > 128)
+                # down = np.where(translation < 128)
 
-                count_up = len(translation[up])
-                count_down = len(translation[down])
-                diff = abs(count_up - count_down)
-                u_plot1.append(diff)
+                # count_up = len(translation[up])
+                # count_down = len(translation[down])
+                # diff = abs(count_up - count_down)
+                # u_plot1.append(diff)
 
                 
 
@@ -476,36 +477,36 @@ class MV_on_Vechicle:
 
 
                 
-                # =================================
-                # 測試把波峰拿掉
-                tempWindow = []
-                if len(u_plot1) > 20:
-                    for i in range(1, 21):
-                        tempWindow.append(u_plot1[-i])
+                # # =================================
+                # # 測試把波峰拿掉
+                # tempWindow = []
+                # if len(u_plot1) > 20:
+                #     for i in range(1, 21):
+                #         tempWindow.append(u_plot1[-i])
 
-                    peaks, _ = find_peaks(tempWindow, prominence=25000)
-                    if 1 in peaks:
-                        temp_lr_center = self.last_center
-                        u_plot2.append(frame_id)
-                    else:
-                        self.last_center = lr_center
-                        temp_lr_center = lr_center
-                else:
-                    for i in range(len(u_plot1)):
-                        tempWindow.append(u_plot1[-i])
+                #     peaks, _ = find_peaks(tempWindow, prominence=25000)
+                #     if 1 in peaks:
+                #         temp_lr_center = self.last_center
+                #         u_plot2.append(frame_id)
+                #     else:
+                #         self.last_center = lr_center
+                #         temp_lr_center = lr_center
+                # else:
+                #     for i in range(len(u_plot1)):
+                #         tempWindow.append(u_plot1[-i])
                         
-                    peaks, _ = find_peaks(tempWindow, prominence=25000)
-                    if 1 in peaks:
-                        temp_lr_center = self.last_center
-                    else:
-                        self.last_center = lr_center
-                        temp_lr_center = lr_center
+                #     peaks, _ = find_peaks(tempWindow, prominence=25000)
+                #     if 1 in peaks:
+                #         temp_lr_center = self.last_center
+                #     else:
+                #         self.last_center = lr_center
+                #         temp_lr_center = lr_center
 
 
 
 
                 self.center_without_avg_list.append(lr_center)
-                self.yolo_cener_without_avg_list.append(temp_lr_center)
+                # self.yolo_cener_without_avg_list.append(temp_lr_center)
 
                 # yolo_lr_center = self.find_center(yolo_tempRow)
                 # self.yolo_cener_without_avg_list.append(yolo_lr_center)
@@ -530,10 +531,10 @@ class MV_on_Vechicle:
 
                     for i in range(1, 21):
                         center_sum += self.center_without_avg_list[-i]
-                        yolo_center_sum += self.yolo_cener_without_avg_list[-i]
+                        # yolo_center_sum += self.yolo_cener_without_avg_list[-i]
 
                     center_avg = int(center_sum / 20)
-                    yolo_center_avg = int(yolo_center_sum / 20)
+                    # yolo_center_avg = int(yolo_center_sum / 20)
                     
 
 
@@ -544,9 +545,9 @@ class MV_on_Vechicle:
                     self.center_list.append(center_avg)
                     cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
                     
-                    # 畫中心位置
-                    self.yolo_center_list.append(yolo_center_avg)
-                    cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
+                    # # 畫中心位置
+                    # self.yolo_center_list.append(yolo_center_avg)
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
                     # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
 
@@ -593,20 +594,22 @@ class MV_on_Vechicle:
 
 
                 # 畫即時圖表
-                # plt.clf()
-                # translation = np.ravel(u.copy())
-                # up = np.where(translation > 128)
-                # down = np.where(translation < 128)
+                plt.clf()
+                translation = np.ravel(u.copy())
+                up = np.where(translation > 128)
+                down = np.where(translation < 128)
 
                 # count_up = len(translation[up])
                 # count_down = len(translation[down])
                 # diff = abs(count_up - count_down)
                 # u_plot1.append(diff)
+                average_up = np.mean(translation[up])
+                u_plot2.append(average_up)
                 # peaks, _ = find_peaks(u_plot1, prominence=25000)
                 
                 # u_plot2.append(count_down)
                 # plt.plot(peaks, np.array(u_plot1)[peaks], 'x')
-                # plt.plot(u_plot1)
+                # plt.plot(u_plot1, label="up")
                 # plt.plot(u_plot2, label="down")
                 # plt.show()
                 # plt.pause(0.0000001)
@@ -627,10 +630,15 @@ class MV_on_Vechicle:
 
                 frame_id += 1
 
-            peaks, _ = find_peaks(u_plot1, prominence=25000)
-            plt.plot(u_plot1)
-            plt.plot(peaks, np.array(u_plot1)[peaks], 'x')
-            plt.plot(u_plot2, np.array(u_plot1)[u_plot2], 'o')
+            u_plot2 = np.array(u_plot2)
+            peaks, _ = find_peaks(u_plot2, prominence=2)
+            
+            valleys, _ = find_peaks(-u_plot2, prominence=2)
+
+            plt.plot(u_plot2)
+            plt.plot(peaks, np.array(u_plot2)[peaks], 'x')
+            plt.plot(valleys, np.array(u_plot2)[valleys], 'o')
+            # plt.plot(u_plot2, np.array(u_plot1)[u_plot2], 'o')
 
             outputStream1.release()
             outputStream2.release()
