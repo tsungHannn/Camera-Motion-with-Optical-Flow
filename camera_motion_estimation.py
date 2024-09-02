@@ -42,8 +42,8 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0701\\edge"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
+        self.dir_path = "mvs_mp4\\0701\\edge"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
@@ -658,7 +658,7 @@ if __name__ == "__main__":
     # plt.plot(detector.lr_center_list, label="mapped")
 
     plt.xlabel("Frame", {'fontsize':20})
-    plt.ylabel("Gap", {'fontsize':20})
+    plt.ylabel("Average", {'fontsize':20})
     # plt.legend(
     #     loc='best',
     #     fontsize=20,
