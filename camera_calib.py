@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import glob
 
-def calibrate_camera(images_folder, chessboard_size=(9, 6), square_size=1.0):
+def calibrate_camera(images_folder, chessboard_size=(9, 6), square_size=29):
     # 設置棋盤格大小和真實世界每個方格的大小
     chessboard_size = chessboard_size
     square_size = square_size
@@ -44,10 +44,10 @@ def calibrate_camera(images_folder, chessboard_size=(9, 6), square_size=1.0):
             cv2.namedWindow("Chessboard", 0)
             cv2.imshow('Chessboard', img)
 
-            # 等待按下 'q' 鍵繼續
-            while True:
-                if cv2.waitKey(1) & 0xFF == ord('q'):
-                    break
+            # # 等待按下 'q' 鍵繼續
+            # while True:
+            #     if cv2.waitKey(1) & 0xFF == ord('q'):
+            #         break
         else:
             print(f"未能在圖像 {fname} 中找到棋盤格角點，請檢查該圖像是否包含完整的棋盤格。")
 
