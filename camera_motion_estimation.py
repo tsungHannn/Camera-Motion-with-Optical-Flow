@@ -48,7 +48,7 @@ class MV_on_Vechicle:
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-33-40_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -415,11 +415,27 @@ class MV_on_Vechicle:
                 
 
 
+                # 把畫面分成兩半，分別計算兩邊的點數量
+                middle_index = self.frame_width // 2
+                # 正常來說左邊是白色點(<128)
+                # 左半部分處理
+                left_half = v.copy()[:, :middle_index]
+                left_half = np.ravel(left_half)
+                leftNumber = len(np.where(left_half != 128)[0])
+
+                # 右半部分處理
+                right_half = v.copy()[:, middle_index:]
+                right_half = np.ravel(right_half)
+                rightNumber = len(np.where(right_half != 128)[0])
+
+
+
+
 
                 # 如果左右點差距小於閥值，就使用上一次的結果
                 for i in range(self.window_number):
                     tempAns = self.estimate(self.window_list[i], threshold="fix")
-                    comp_tempAns = self.estimate(self.comp_window_list[i], threshold="dynamic")
+                    comp_tempAns = self.estimate(self.comp_window_list[i], threshold="fix")
 
                     if(tempAns == "None"):
                         self.window_state.append(self.last_state[i])
@@ -440,8 +456,8 @@ class MV_on_Vechicle:
                 for i in range(self.window_number):
                     # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
                     if(self.window_state[i] == ""):
-                        self.window_result[i].append(20)
-                        tempRow.append(20)
+                        self.window_result[i].append(0)
+                        tempRow.append(0)
                     else:
                         self.window_result[i].append(int(self.window_state[i]))
                         tempRow.append(int(self.window_state[i]))
@@ -456,7 +472,7 @@ class MV_on_Vechicle:
                     else:
                         self.comp_window_result[i].append(int(self.comp_window_state[i]))
                         comp_tempRow.append(int(self.comp_window_state[i]))
-
+                
                 lr_center = self.find_center(tempRow)
 
 
@@ -494,6 +510,13 @@ class MV_on_Vechicle:
                 self.center_without_avg_list.append(lr_center)
                 # self.yolo_cener_without_avg_list.append(temp_lr_center)
 
+
+                if leftNumber > rightNumber:
+                    for i in range(0,20):
+                        comp_tempRow[i] = comp_tempRow[i] * rightNumber / (leftNumber+rightNumber)
+                elif leftNumber < rightNumber:
+                    for i in range(21,40):
+                        comp_tempRow[i] = comp_tempRow[i] * leftNumber / (leftNumber+rightNumber)
                 comp_lr_center = self.find_center(comp_tempRow)
                 self.comp_center_without_avg_list.append(comp_lr_center)
 
@@ -547,7 +570,7 @@ class MV_on_Vechicle:
 
                 else:
                     self.center_list.append(20) # 為了畫圖合理，前面20幀沒有數據補0
-                    self.comp_center_list.append(0)
+                    self.comp_center_list.append(20)
 
 
                     
