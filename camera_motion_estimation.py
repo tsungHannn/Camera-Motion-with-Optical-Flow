@@ -1,5 +1,5 @@
 import os
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 import cv2 as cv
 import numpy as np
 import matplotlib
@@ -9,11 +9,12 @@ import yaml
 from ultralytics import YOLO
 from utils import KalmanFilter
 # from sklearn.cluster import DBSCAN
-from sklearn.cluster import HDBSCAN
-from hdbscan import HDBSCAN
-# from cuml.common.device_selection import using_device_type
+# from sklearn.cluster import HDBSCAN
+# from hdbscan import HDBSCAN
+from cuml.common.device_selection import using_device_type
 # from cuml.cluster import DBSCAN as cuDBSCAN
-# from cuml.cluster import HDBSCAN
+from cuml.cluster import HDBSCAN
+import time
 
 # matplotlib.use("Qt5Agg")
 
@@ -42,13 +43,13 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\0701\\gray"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
+        # self.dir_path = "mvs_mp4\\0701\\gray"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701
+        self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -79,6 +80,7 @@ class MV_on_Vechicle:
 
         self.last_center = 20
         self.is_detect = True # 轉彎時不進行物件偵測
+        self.last_v = None # 如果偵測到y軸波峰，就把整個x軸向量換成上一幀
 
 
 
@@ -97,7 +99,6 @@ class MV_on_Vechicle:
         if threshold == "fix":
             self.threshold = img.shape[0]*img.shape[1]//3
 
-            plus = len(right_index[0]) + len(left_index[0])
             diff = len(right_index[0]) - len(left_index[0])
             if diff > self.threshold:
                 return 1 # 向右
@@ -109,15 +110,16 @@ class MV_on_Vechicle:
             self.threshold = img.shape[0]*img.shape[1]//3
 
             plus = len(right_index[0]) + len(left_index[0])
+
             diff = len(right_index[0]) - len(left_index[0])
             if diff > self.threshold:
                 return 1 # 向右
             elif diff < -1 * self.threshold:
                 return -1 # 向左
-            elif diff > plus*0.5 and diff < self.threshold:
-                return 0.5
-            elif diff < plus*0.5 and diff < -1 * self.threshold:
-                return -0.5
+            elif diff > plus*0.6 and diff < self.threshold:
+                return plus/self.threshold
+            elif diff > plus*0.6 and diff > 0 and diff > -1 * self.threshold:
+                return -1 * plus/self.threshold
             else:
                 return "None"
         else:
@@ -194,7 +196,8 @@ class MV_on_Vechicle:
         return processed_image_array
     
     def dbscan_filter(self, img):
-
+        
+        filter_img = img.copy()
         middle_index = self.frame_width // 2
 
         # 正常來說左邊是白色點(<128)，所以只留大於128的點，再判斷是不是雜訊
@@ -223,12 +226,13 @@ class MV_on_Vechicle:
 
 
         
-        cv.imshow("processed_img", processed_image_array)
+        # cv.imshow("processed_img", processed_image_array)
         # 將數據點轉換為NumPy陣列
         X = np.array(X)
-        # with using_device_type("GPU"):
-            # db = HDBSCAN(min_samples=10).fit(X)
-        db = HDBSCAN().fit(X)
+        
+        with using_device_type("GPU"):
+            db = HDBSCAN(min_samples=10).fit(X)
+        # db = HDBSCAN().fit(X)
         labels = db.labels_
 
 
@@ -249,16 +253,19 @@ class MV_on_Vechicle:
                 label = labels[index]
                 if label == -1:
                     color = (0, 0, 0)  # 雜訊顯示為黑色
+                    filter_img[i, j] = 128 # 去雜訊
                 else:
-                    color = colors[label]
+                    color = (255,255,255)
+                    # color = colors[label]
                 clustered_visual[i, j] = color  # 為每個像素賦予RGB顏色值
                 index += 1
 
 
 
         # 顯示或保存結果
-        cv.imshow('Clustered Video', clustered_visual)
-        # outputStream2.write(clustered_visual)
+        # cv.imshow('Clustered Video', clustered_visual)
+        # outputStream3.write(clustered_visual)
+        return clustered_visual, filter_img
 
 
     def run(self):
@@ -280,7 +287,7 @@ class MV_on_Vechicle:
             save_name = "motion_" + filename[:-4] + ".mp4"
             outputStream1 = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             outputStream2 = cv.VideoWriter("save.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-
+            outputStream3 = cv.VideoWriter("dbscan_vis.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
 
             # initialise text variables to draw on frames
             # motion_list = []
@@ -337,12 +344,14 @@ class MV_on_Vechicle:
             #         R=measurementNoiseCov)
             
 
-            # u_plot1 = []
+            u_plot1 = []
             # u_plot2 = []
-            # tempWindow = []
+            y_peak_window = []
+            v_window = []
             # plt.ion()
 
             # main loop 
+            start_time = time.time()
             while True:
                 # read a new frame
                 ret, nxt = cap.read()
@@ -358,23 +367,41 @@ class MV_on_Vechicle:
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
                 y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
+                
+                v_window.insert(0, v)
+                if len(v_window) <= 3:
+                    continue
+                if len(v_window) > 10:
+                    v_window.pop()
+                
 
-
-
-                # translation = np.ravel(u.copy())
-                # average = np.mean(translation)
-                # up = np.where(translation > 128)
-                # down = np.where(translation < 128)
-
-                # count_up = len(translation[up])
-                # count_down = len(translation[down])
-                # diff = abs(count_up - count_down)
+                # 如果y軸檢測出波峰，就捨棄本次結果，用上一幀
+                translation = np.ravel(u.copy())
+                average = np.mean(translation)
                 # u_plot1.append(average)
+
+                # =================================
+                # 儲存前50幀，以作為判斷波峰的依據
+                y_peak_window.insert(0, average)
+                # tempWindow.append(u_plot1[-1])
+                if len(y_peak_window) > 50:
+                    y_peak_window.pop()
+                
+                np_y_peak_window = np.array(y_peak_window.copy())
+                peaks, _ = find_peaks(np_y_peak_window, prominence=1.5)
+                valley, _ = find_peaks(-np_y_peak_window, prominence=1.5)
+
+                # if len(peaks) > 0 or len(valley) > 0:
+                #     print()
+                for i in [2, 1, 0]:
+                    if i in peaks or i in valley:
+                        # print("Ignore", i, "FrameID", frame_id)
+                        v_window[i] = v_window[i+1]
 
                 
 
                 # dbscanV = v.copy()
-                # self.dbscan_filter(dbscanV)
+                # filter_vis, filter_v = self.dbscan_filter(dbscanV)
 
 
                 yuv_with_polygons = nxt.copy()
@@ -390,8 +417,9 @@ class MV_on_Vechicle:
 
                 # 直切
                 for i in range(self.window_number):
-                    self.window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
-                    self.comp_window_list.append(v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    # 經過y軸檢測波峰後，開始檢測移動方向
+                    self.window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    self.comp_window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
                     
                     # # 實際偵測範圍
                     # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
@@ -415,27 +443,10 @@ class MV_on_Vechicle:
                 
 
 
-                # 把畫面分成兩半，分別計算兩邊的點數量
-                middle_index = self.frame_width // 2
-                # 正常來說左邊是白色點(<128)
-                # 左半部分處理
-                left_half = v.copy()[:, :middle_index]
-                left_half = np.ravel(left_half)
-                leftNumber = len(np.where(left_half != 128)[0])
-
-                # 右半部分處理
-                right_half = v.copy()[:, middle_index:]
-                right_half = np.ravel(right_half)
-                rightNumber = len(np.where(right_half != 128)[0])
-
-
-
-
-
                 # 如果左右點差距小於閥值，就使用上一次的結果
                 for i in range(self.window_number):
                     tempAns = self.estimate(self.window_list[i], threshold="fix")
-                    comp_tempAns = self.estimate(self.comp_window_list[i], threshold="fix")
+                    comp_tempAns = self.estimate(self.comp_window_list[i], threshold="dynamic")
 
                     if(tempAns == "None"):
                         self.window_state.append(self.last_state[i])
@@ -448,7 +459,6 @@ class MV_on_Vechicle:
                     if(comp_tempAns != "None"):
                         self.comp_last_state[i] = comp_tempAns
                         self.comp_window_state.append(comp_tempAns)
-                    
                     
 
                 # 儲存每個window的結果
@@ -472,53 +482,20 @@ class MV_on_Vechicle:
                     else:
                         self.comp_window_result[i].append(int(self.comp_window_state[i]))
                         comp_tempRow.append(int(self.comp_window_state[i]))
-                
+
+
                 lr_center = self.find_center(tempRow)
-
-
-
-                
-                # # =================================
-                # # 測試把波峰拿掉
-                # tempWindow.insert(0, u_plot1[-1])
-                # # tempWindow.append(u_plot1[-1])
-                # if len(tempWindow) > 50:
-                #     tempWindow.pop()
-                
-
-
-                # np_tempWindow = np.array(tempWindow.copy())
-                # peaks, _ = find_peaks(np_tempWindow, prominence=1.5)
-                # valley, _ = find_peaks(-np_tempWindow, prominence=1.5)
-                
-                # # if len(peaks) > 0 or len(valley) > 0:
-                # #     print()
-                # if 1 in peaks or 1 in valley or 0 in peaks or 0 in valley:
-                #     if lr_center == self.last_center:
-                #         print("Frame:", frame_id, "  Center:", lr_center, " -> ", self.last_center)
-                #     else:
-                #         print("Frame:", frame_id, "  Center:", lr_center, " -> ", self.last_center, "@@@")
-                #     temp_lr_center = self.last_center
-                #     u_plot2.append(frame_id)
-                # else:
-                #     self.last_center = lr_center
-                #     temp_lr_center = lr_center
-
-
-
-
                 self.center_without_avg_list.append(lr_center)
-                # self.yolo_cener_without_avg_list.append(temp_lr_center)
 
-
-                if leftNumber > rightNumber:
-                    for i in range(0,20):
-                        comp_tempRow[i] = comp_tempRow[i] * rightNumber / (leftNumber+rightNumber)
-                elif leftNumber < rightNumber:
-                    for i in range(21,40):
-                        comp_tempRow[i] = comp_tempRow[i] * leftNumber / (leftNumber+rightNumber)
                 comp_lr_center = self.find_center(comp_tempRow)
+
+
                 self.comp_center_without_avg_list.append(comp_lr_center)
+                
+
+                
+                # self.yolo_cener_without_avg_list.append(temp_lr_center)
+               
 
 
                 # # # Kalman Filter
@@ -593,8 +570,8 @@ class MV_on_Vechicle:
                 # outputV = cv.merge((y,y,y))
                 # cv.imshow("gray", y)
                 # cv.imshow("y", y)
-                cv.imshow("u", u)
-                cv.imshow("v", v)
+                # cv.imshow("u", u)
+                # cv.imshow("v", v)
                 # cv.imwrite("gray.jpg", y)
                 # cv.imwrite("v.jpg", v)
                 # cv.imwrite("polygons.jpg", yuv_with_polygons)
@@ -635,6 +612,7 @@ class MV_on_Vechicle:
                 outputV = cv.merge((v,v,v))
                 outputStream1.write(yuv_with_polygons)
                 outputStream2.write(outputV)
+                # outputStream3.write(filter_vis)
 
 
                 frame_id += 1
@@ -649,8 +627,17 @@ class MV_on_Vechicle:
             # plt.plot(valleys, np.array(u_plot1)[valleys], 'o')
             # plt.plot(u_plot2, np.array(u_plot1)[u_plot2], 'o')
 
+
             outputStream1.release()
             outputStream2.release()
+            outputStream3.release()
+            end_time = time.time()
+            execution_time = end_time - start_time
+            minutes = int(execution_time // 60)
+            seconds = int(execution_time % 60)
+            print(f"Execution time: {minutes}min {seconds}sec")
+            print("Frame:", frame_id)
+            return
 
 
 
