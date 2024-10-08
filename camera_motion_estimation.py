@@ -11,9 +11,9 @@ from utils import KalmanFilter
 # from sklearn.cluster import DBSCAN
 # from sklearn.cluster import HDBSCAN
 # from hdbscan import HDBSCAN
-from cuml.common.device_selection import using_device_type
+# from cuml.common.device_selection import using_device_type
 # from cuml.cluster import DBSCAN as cuDBSCAN
-from cuml.cluster import HDBSCAN
+# from cuml.cluster import HDBSCAN
 import time
 
 # matplotlib.use("Qt5Agg")
@@ -43,13 +43,14 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\0701\\gray"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
+        self.dir_path = "mvs_mp4\\0701\\gray"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701
+        # self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701 edge
+        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -112,14 +113,38 @@ class MV_on_Vechicle:
             plus = len(right_index[0]) + len(left_index[0])
 
             diff = len(right_index[0]) - len(left_index[0])
-            if diff > self.threshold:
-                return 1 # 向右
-            elif diff < -1 * self.threshold:
-                return -1 # 向左
-            elif diff > plus*0.6 and diff < self.threshold:
-                return plus/self.threshold
-            elif diff > plus*0.6 and diff > 0 and diff > -1 * self.threshold:
-                return -1 * plus/self.threshold
+
+            if plus == 0:
+                return "None"
+            right_rate = len(right_index[0]) / plus
+            left_rate = len(left_index[0]) / plus
+            # rate = abs(diff) / plus
+
+            rate_threshold = 0.7
+            if right_rate > rate_threshold:
+                normalized_value = (right_rate-rate_threshold)/(1-rate_threshold)
+                return normalized_value
+            elif left_rate > rate_threshold:
+                normalized_value = (left_rate-rate_threshold)/(1-rate_threshold)
+                return -1 * normalized_value
+
+
+            # if rate > 0.7 and diff > 0: # 向右
+            #     return 1
+            # elif rate > 0.7 and diff < 0: # 向左
+            #     return -1
+            # if rate > 0.5 and diff > 0: # 可能向右
+            #     return rate
+            # elif rate > 0.5 and diff < 0: #可能向左
+            #     return -1 * rate
+            # if diff > self.threshold:
+            #     return 1 # 向右
+            # elif diff < -1 * self.threshold:
+            #     return -1 # 向左
+            # elif diff > plus*0.6 and diff < self.threshold:
+            #     return plus/self.threshold
+            # elif diff > plus*0.6 and diff > 0 and diff > -1 * self.threshold:
+            #     return -1 * plus/self.threshold
             else:
                 return "None"
         else:
@@ -195,77 +220,77 @@ class MV_on_Vechicle:
 
         return processed_image_array
     
-    def dbscan_filter(self, img):
+    # def dbscan_filter(self, img):
         
-        filter_img = img.copy()
-        middle_index = self.frame_width // 2
+    #     filter_img = img.copy()
+    #     middle_index = self.frame_width // 2
 
-        # 正常來說左邊是白色點(<128)，所以只留大於128的點，再判斷是不是雜訊
-        # 左半部分處理
-        left_half = img[:, :middle_index]
-        left_half[left_half > 128] = 128
+    #     # 正常來說左邊是白色點(<128)，所以只留大於128的點，再判斷是不是雜訊
+    #     # 左半部分處理
+    #     left_half = img[:, :middle_index]
+    #     left_half[left_half > 128] = 128
 
-        # 右半部分處理
-        right_half = img[:, middle_index:]
-        right_half[right_half < 128] = 128
+    #     # 右半部分處理
+    #     right_half = img[:, middle_index:]
+    #     right_half[right_half < 128] = 128
 
-        processed_image_array = np.hstack((left_half, right_half))
+    #     processed_image_array = np.hstack((left_half, right_half))
 
-        # 正規化
-        normalized_image_array = processed_image_array / 255.0
-        mean = np.mean(processed_image_array)
-        std = np.std(processed_image_array)
-        standardized_image_array = (processed_image_array - mean) / std
+    #     # 正規化
+    #     normalized_image_array = processed_image_array / 255.0
+    #     mean = np.mean(processed_image_array)
+    #     std = np.std(processed_image_array)
+    #     standardized_image_array = (processed_image_array - mean) / std
 
-        X = []
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                # 將(i, j)座標和灰階值結合成一個數據點
+    #     X = []
+    #     for i in range(img.shape[0]):
+    #         for j in range(img.shape[1]):
+    #             # 將(i, j)座標和灰階值結合成一個數據點
 
-                X.append([i, j, standardized_image_array[i][j]])
+    #             X.append([i, j, standardized_image_array[i][j]])
 
 
         
-        # cv.imshow("processed_img", processed_image_array)
-        # 將數據點轉換為NumPy陣列
-        X = np.array(X)
+    #     # cv.imshow("processed_img", processed_image_array)
+    #     # 將數據點轉換為NumPy陣列
+    #     X = np.array(X)
         
-        with using_device_type("GPU"):
-            db = HDBSCAN(min_samples=10).fit(X)
-        # db = HDBSCAN().fit(X)
-        labels = db.labels_
+    #     with using_device_type("GPU"):
+    #         db = HDBSCAN(min_samples=10).fit(X)
+    #     # db = HDBSCAN().fit(X)
+    #     labels = db.labels_
 
 
-        # 將分群結果轉換為可視化圖像
+    #     # 將分群結果轉換為可視化圖像
 
-        # 創建一個與原圖相同尺寸的空白圖像，用於存放可視化結果
-        clustered_visual = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
+    #     # 創建一個與原圖相同尺寸的空白圖像，用於存放可視化結果
+    #     clustered_visual = np.zeros((img.shape[0], img.shape[1], 3), dtype=np.uint8)
 
-        # 為每個群組分配一個隨機顏色（-1表示雜訊，會以黑色顯示）
-        unique_labels = np.unique(labels)
-        colors = plt.cm.get_cmap('hsv', len(unique_labels))(range(len(unique_labels)))
-        colors = (colors[:, :3] * 255).astype(int)  # HSV to RGB and scale to 0-255
+    #     # 為每個群組分配一個隨機顏色（-1表示雜訊，會以黑色顯示）
+    #     unique_labels = np.unique(labels)
+    #     colors = plt.cm.get_cmap('hsv', len(unique_labels))(range(len(unique_labels)))
+    #     colors = (colors[:, :3] * 255).astype(int)  # HSV to RGB and scale to 0-255
 
-        # 遍歷每個點並分配顏色
-        index = 0
-        for i in range(img.shape[0]):
-            for j in range(img.shape[1]):
-                label = labels[index]
-                if label == -1:
-                    color = (0, 0, 0)  # 雜訊顯示為黑色
-                    filter_img[i, j] = 128 # 去雜訊
-                else:
-                    color = (255,255,255)
-                    # color = colors[label]
-                clustered_visual[i, j] = color  # 為每個像素賦予RGB顏色值
-                index += 1
+    #     # 遍歷每個點並分配顏色
+    #     index = 0
+    #     for i in range(img.shape[0]):
+    #         for j in range(img.shape[1]):
+    #             label = labels[index]
+    #             if label == -1:
+    #                 color = (0, 0, 0)  # 雜訊顯示為黑色
+    #                 filter_img[i, j] = 128 # 去雜訊
+    #             else:
+    #                 color = (255,255,255)
+    #                 # color = colors[label]
+    #             clustered_visual[i, j] = color  # 為每個像素賦予RGB顏色值
+    #             index += 1
 
 
 
-        # 顯示或保存結果
-        # cv.imshow('Clustered Video', clustered_visual)
-        # outputStream3.write(clustered_visual)
-        return clustered_visual, filter_img
+    #     # 顯示或保存結果
+    #     # cv.imshow('Clustered Video', clustered_visual)
+    #     # outputStream3.write(clustered_visual)
+    #     return clustered_visual, filter_img
 
 
     def run(self):
@@ -480,16 +505,14 @@ class MV_on_Vechicle:
                         self.comp_window_result[i].append(0)
                         comp_tempRow.append(0)
                     else:
-                        self.comp_window_result[i].append(int(self.comp_window_state[i]))
-                        comp_tempRow.append(int(self.comp_window_state[i]))
+                        self.comp_window_result[i].append(self.comp_window_state[i])
+                        comp_tempRow.append(self.comp_window_state[i])
 
 
                 lr_center = self.find_center(tempRow)
                 self.center_without_avg_list.append(lr_center)
 
                 comp_lr_center = self.find_center(comp_tempRow)
-
-
                 self.comp_center_without_avg_list.append(comp_lr_center)
                 
 
@@ -571,7 +594,7 @@ class MV_on_Vechicle:
                 # cv.imshow("gray", y)
                 # cv.imshow("y", y)
                 # cv.imshow("u", u)
-                # cv.imshow("v", v)
+                cv.imshow("v", v)
                 # cv.imwrite("gray.jpg", y)
                 # cv.imwrite("v.jpg", v)
                 # cv.imwrite("polygons.jpg", yuv_with_polygons)
