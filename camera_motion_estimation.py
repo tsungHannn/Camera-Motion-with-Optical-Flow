@@ -43,14 +43,14 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\0701\\gray"
+        self.dir_path = "mvs_mp4\\0701\\edge"
         # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        # self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701 edge
-        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
+        self.all_file = ["test_2024-07-01-02-51-22_mvs_compressed.mp4"] # 0701 edge
+        # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -108,25 +108,35 @@ class MV_on_Vechicle:
             else:
                 return "None"
         elif threshold == "dynamic":
-            self.threshold = img.shape[0]*img.shape[1]//3
 
-            plus = len(right_index[0]) + len(left_index[0])
+            self.threshold = img.shape[0]*img.shape[1] * 0.45
 
             diff = len(right_index[0]) - len(left_index[0])
+            if diff > self.threshold:
+                return 1 # 向右
+            elif diff < -1 * self.threshold:
+                return -1 # 向左
 
-            if plus == 0:
-                return "None"
-            right_rate = len(right_index[0]) / plus
-            left_rate = len(left_index[0]) / plus
-            # rate = abs(diff) / plus
+            # self.threshold = img.shape[0]*img.shape[1]//3
 
-            rate_threshold = 0.7
-            if right_rate > rate_threshold:
-                normalized_value = (right_rate-rate_threshold)/(1-rate_threshold)
-                return normalized_value
-            elif left_rate > rate_threshold:
-                normalized_value = (left_rate-rate_threshold)/(1-rate_threshold)
-                return -1 * normalized_value
+            # plus = len(right_index[0]) + len(left_index[0])
+
+            # diff = len(right_index[0]) - len(left_index[0])
+
+            # if plus == 0:
+            #     return "None"
+            # right_rate = len(right_index[0]) / plus
+            # left_rate = len(left_index[0]) / plus
+            # # rate = abs(diff) / plus
+
+            # rate_threshold = 0.8
+            # if right_rate > rate_threshold:
+            #     normalized_value = (right_rate-rate_threshold)/(1-rate_threshold)
+            #     return normalized_value
+            # elif left_rate > rate_threshold:
+            #     normalized_value = (left_rate-rate_threshold)/(1-rate_threshold)
+            #     return -1 * normalized_value
+
 
 
             # if rate > 0.7 and diff > 0: # 向右
@@ -440,11 +450,16 @@ class MV_on_Vechicle:
                 self.window_state.clear()
                 self.comp_window_state.clear()
 
+                median_v = v_window[3].copy()
+                median_v = cv.blur(median_v, (9, 9))
+                # median_v = cv.GaussianBlur(median_v, (9,9), 0)
+                cv.imshow("median_v", median_v)
                 # 直切
                 for i in range(self.window_number):
                     # 經過y軸檢測波峰後，開始檢測移動方向
+                    # v_window[3]是因為前兩幀用來檢測波峰
                     self.window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
-                    self.comp_window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    self.comp_window_list.append(median_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     
                     # # 實際偵測範圍
                     # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
@@ -580,7 +595,7 @@ class MV_on_Vechicle:
 
 
                 # cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
-                cv.putText(yuv_with_polygons, str(frame_id), (610, 20), self.font, 0.5, (0, 0, 255), 1)
+                cv.putText(yuv_with_polygons, str(frame_id), (590, 20), self.font, 0.5, (0, 0, 255), 1)
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 # u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
@@ -626,16 +641,16 @@ class MV_on_Vechicle:
                 
                 
 
-                # if cv.waitKey(25) & 0xFF == ord('q'):
-                #     break
-                # # 不用 YOLO 偵測的話會跑太快
-                if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
+                if cv.waitKey(25) & 0xFF == ord('q'):
                     break
+                # # 不用 YOLO 偵測的話會跑太快
+                # if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
+                #     break
                 
                 outputV = cv.merge((v,v,v))
                 outputStream1.write(yuv_with_polygons)
                 outputStream2.write(outputV)
-                # outputStream3.write(filter_vis)
+                outputStream3.write(cv.merge((median_v, median_v, median_v)))
 
 
                 frame_id += 1
