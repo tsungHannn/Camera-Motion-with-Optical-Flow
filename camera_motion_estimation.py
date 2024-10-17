@@ -49,7 +49,7 @@ class MV_on_Vechicle:
         # self.all_file = sorted(self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-51-22_mvs_compressed.mp4"] # 0701 edge
+        self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701 edge
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
