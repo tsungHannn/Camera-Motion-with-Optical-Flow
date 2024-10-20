@@ -27,6 +27,14 @@ V: 垂直向量(320*480)  V > 128:向上   V < 128:向下
 
 """
 
+
+
+
+def get_pixel_position(event, x, y, flags, param):
+    if event == cv.EVENT_LBUTTONDOWN:  # 左键点击事件
+        print(f"Clicked pixel position: ({x}, {y})")
+
+
 class MV_on_Vechicle:
     def __init__(self):
         # 讀MV內參
@@ -82,7 +90,6 @@ class MV_on_Vechicle:
         self.last_center = 20
         self.is_detect = True # 轉彎時不進行物件偵測
         self.last_v = None # 如果偵測到y軸波峰，就把整個x軸向量換成上一幀
-
 
 
         self.model = YOLO('yolov8m.pt')
@@ -320,10 +327,10 @@ class MV_on_Vechicle:
             frameRate = int(cap.get(cv.CAP_PROP_FPS))
             codec = cv.VideoWriter_fourcc(*'mp4v')
             save_name = "motion_" + filename[:-4] + ".mp4"
-            outputStream1 = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-            outputStream2 = cv.VideoWriter("save.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-            outputStream3 = cv.VideoWriter("dbscan_vis.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-
+            outputResult = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+            outputStream1 = cv.VideoWriter("output1.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+            outputStream2 = cv.VideoWriter("output2.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+            outputStream3 = cv.VideoWriter("output3.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             # initialise text variables to draw on frames
             # motion_list = []
             # realMotion = 'None'
@@ -450,16 +457,32 @@ class MV_on_Vechicle:
                 self.window_state.clear()
                 self.comp_window_state.clear()
 
-                median_v = v_window[3].copy()
-                median_v = cv.blur(median_v, (9, 9))
+                # median_v = v_window[3].copy()
+                # median_v = cv.medianBlur(median_v, 9)
+                average_v = v_window[3].copy()
+                average_v = cv.blur(average_v, (9, 9))
                 # median_v = cv.GaussianBlur(median_v, (9,9), 0)
-                cv.imshow("median_v", median_v)
+                # cv.imshow("median_v", median_v)
+                cv.imshow("average_v", average_v)
+
+                # 視覺化v_window[3]跟median_v的差別
+                diff_v = average_v.copy()
+                diff_v[:] = 128
+                diff_mask = (v_window[3] > 128) & (average_v < 128) # 向左變向右
+                diff_v[diff_mask] = 255
+                diff_mask = (v_window[3] < 128) & (average_v > 128) # 向右變向左
+                diff_v[diff_mask] = 255
+                diff_mask = (v_window[3] != 128) & (average_v == 128) # 變成128
+                diff_v[diff_mask] = 255
+                diff_mask = (v_window[3] == 128) & (average_v != 128) # 變成不是128
+                diff_v[diff_mask] = 255
+                cv.imshow("diff", diff_v)
                 # 直切
                 for i in range(self.window_number):
                     # 經過y軸檢測波峰後，開始檢測移動方向
                     # v_window[3]是因為前兩幀用來檢測波峰
                     self.window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
-                    self.comp_window_list.append(median_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    self.comp_window_list.append(average_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     
                     # # 實際偵測範圍
                     # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
@@ -616,7 +639,6 @@ class MV_on_Vechicle:
                 # for i in range(self.window_number):
                 #     cv.imshow(str(i), self.lr_window_list[i])
 
-
                 # # 畫即時圖表
                 # plt.clf()
                 # translation = np.ravel(u.copy())
@@ -648,12 +670,23 @@ class MV_on_Vechicle:
                 #     break
                 
                 outputV = cv.merge((v,v,v))
-                outputStream1.write(yuv_with_polygons)
-                outputStream2.write(outputV)
-                outputStream3.write(cv.merge((median_v, median_v, median_v)))
+                outputResult.write(yuv_with_polygons)
+                outputStream1.write(outputV)
+                outputStream2.write(cv.merge((average_v, average_v, average_v)))
+                # outputStream3.write(cv.merge((diff_v, diff_v, diff_v)))
 
+
+                # if frame_id == 44:
+                #     for i in range(40, 60):
+                #         for j in range(80, 100):
+                #             print(v[i][j], "\t", end="")
+                #         print()
+                    
+                #     print()
 
                 frame_id += 1
+
+                
 
             # u_plot1 = np.array(u_plot1)
             # peaks, _ = find_peaks(u_plot1, prominence=2)
@@ -666,6 +699,7 @@ class MV_on_Vechicle:
             # plt.plot(u_plot2, np.array(u_plot1)[u_plot2], 'o')
 
 
+            outputResult.release()
             outputStream1.release()
             outputStream2.release()
             outputStream3.release()
