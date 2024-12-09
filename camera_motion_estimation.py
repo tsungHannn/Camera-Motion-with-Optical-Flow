@@ -51,14 +51,16 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\0701\\edge"
+        self.dir_path = "mvs_mp4\\1108\\edge"
         # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
+        # print("all_file:", self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
-        self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701 edge
+        # self.all_file = ["test_2024-07-01-02-45-59_mvs_compressed.mp4"] # 0701 edge
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
+        self.all_file = ["2024-11-08-03-43-40_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
   
@@ -116,7 +118,7 @@ class MV_on_Vechicle:
                 return "None"
         elif threshold == "dynamic":
 
-            self.threshold = img.shape[0]*img.shape[1] * 0.45
+            self.threshold = img.shape[0]*img.shape[1] * 0.4
 
             diff = len(right_index[0]) - len(left_index[0])
             if diff > self.threshold:
@@ -359,24 +361,24 @@ class MV_on_Vechicle:
                 self.comp_window_result.append([])
             
 
-            # stateMatrix = np.array([[20.0]], dtype=np.float32)
+            stateMatrix = np.array([[20.0]], dtype=np.float32)
 
-            # estimateCovariance = np.array([[1.0]], dtype=np.float32)
-            # transitionMatrix = np.array([[1.0]], dtype=np.float32)
-            # processNoiseCov = np.array([[0.01]], dtype=np.float32)
+            estimateCovariance = np.array([[1.0]], dtype=np.float32)
+            transitionMatrix = np.array([[1.0]], dtype=np.float32)
+            processNoiseCov = np.array([[0.01]], dtype=np.float32)
 
-            # measurementStateMatrix = np.array([[0.0]], dtype=np.float32)
+            measurementStateMatrix = np.array([[0.0]], dtype=np.float32)
 
-            # observationMatrix = np.array([[1.0]], dtype=np.float32)
-            # measurementNoiseCov = np.array([[3.0]], dtype=np.float32)
+            observationMatrix = np.array([[1.0]], dtype=np.float32)
+            measurementNoiseCov = np.array([[3.0]], dtype=np.float32)
 
-            # kf1 = KalmanFilter(X=stateMatrix,
-            #         P=estimateCovariance,
-            #         F=transitionMatrix,
-            #         Q=processNoiseCov,
-            #         Z=measurementStateMatrix,
-            #         H=observationMatrix,
-            #         R=measurementNoiseCov)
+            kf1 = KalmanFilter(X=stateMatrix,
+                    P=estimateCovariance,
+                    F=transitionMatrix,
+                    Q=processNoiseCov,
+                    Z=measurementStateMatrix,
+                    H=observationMatrix,
+                    R=measurementNoiseCov)
             # kf2 = KalmanFilter(X=stateMatrix,
             #         P=estimateCovariance,
             #         F=transitionMatrix,
@@ -392,6 +394,7 @@ class MV_on_Vechicle:
             v_window = []
             # plt.ion()
 
+            ignored_frame = 0
             # main loop 
             start_time = time.time()
             while True:
@@ -437,7 +440,8 @@ class MV_on_Vechicle:
                 #     print()
                 for i in [2, 1, 0]:
                     if i in peaks or i in valley:
-                        # print("Ignore", i, "FrameID", frame_id)
+                        print("Ignore", i, "FrameID", frame_id)
+                        ignored_frame += 1
                         v_window[i] = v_window[i+1]
 
                 
@@ -463,25 +467,29 @@ class MV_on_Vechicle:
                 average_v = cv.blur(average_v, (9, 9))
                 # median_v = cv.GaussianBlur(median_v, (9,9), 0)
                 # cv.imshow("median_v", median_v)
-                cv.imshow("average_v", average_v)
+                # cv.imshow("average_v", average_v)
 
                 # 視覺化v_window[3]跟median_v的差別
-                diff_v = average_v.copy()
-                diff_v[:] = 128
-                diff_mask = (v_window[3] > 128) & (average_v < 128) # 向左變向右
-                diff_v[diff_mask] = 255
-                diff_mask = (v_window[3] < 128) & (average_v > 128) # 向右變向左
-                diff_v[diff_mask] = 255
-                diff_mask = (v_window[3] != 128) & (average_v == 128) # 變成128
-                diff_v[diff_mask] = 255
-                diff_mask = (v_window[3] == 128) & (average_v != 128) # 變成不是128
-                diff_v[diff_mask] = 255
-                cv.imshow("diff", diff_v)
+                # diff_v = average_v.copy()
+                # diff_v[:] = 0
+                # difference = np.abs(v_window[3].astype(np.int16) - average_v.astype(np.int16))
+                # diff_mask = difference > 20
+                # diff_v[diff_mask] = 255
+                # diff_v[:] = 128
+                # diff_mask = (v_window[3] > 128) & (average_v < 128) # 向左變向右
+                # diff_v[diff_mask] = 255
+                # diff_mask = (v_window[3] < 128) & (average_v > 128) # 向右變向左
+                # diff_v[diff_mask] = 255
+                # diff_mask = (v_window[3] != 128) & (average_v == 128) # 變成128
+                # diff_v[diff_mask] = 255
+                # diff_mask = (v_window[3] == 128) & (average_v != 128) # 變成不是128
+                # diff_v[diff_mask] = 255
+                # cv.imshow("diff", diff_v)
                 # 直切
                 for i in range(self.window_number):
                     # 經過y軸檢測波峰後，開始檢測移動方向
                     # v_window[3]是因為前兩幀用來檢測波峰
-                    self.window_list.append(v_window[3][window_top:window_bottom, window_width*i:window_width*(i+1)])
+                    self.window_list.append(average_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     self.comp_window_list.append(average_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     
                     # # 實際偵測範圍
@@ -508,7 +516,7 @@ class MV_on_Vechicle:
 
                 # 如果左右點差距小於閥值，就使用上一次的結果
                 for i in range(self.window_number):
-                    tempAns = self.estimate(self.window_list[i], threshold="fix")
+                    tempAns = self.estimate(self.window_list[i], threshold="dynamic")
                     comp_tempAns = self.estimate(self.comp_window_list[i], threshold="dynamic")
 
                     if(tempAns == "None"):
@@ -565,9 +573,9 @@ class MV_on_Vechicle:
                 # corrected_state = int(kf2.correct(current_measurement))
                 # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-30), 6, (31,198,0), -1)
 
-                # current_measurement = np.array([[yolo_lr_center]], dtype=np.float32)
-                # current_prediction = kf1.predict()
-                # corrected_state = int(kf1.correct(current_measurement))
+                current_measurement = np.array([[lr_center]], dtype=np.float32)
+                current_prediction = kf1.predict()
+                corrected_state = int(kf1.correct(current_measurement))
                 # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-50), 6, (0,0,255), -1)
                 
                 
@@ -585,7 +593,7 @@ class MV_on_Vechicle:
                     
 
 
-
+                    center_avg = int((center_avg + corrected_state) / 2) # 卡爾曼濾波 + 移動平均
 
 
                     # # 畫中心位置
@@ -594,7 +602,7 @@ class MV_on_Vechicle:
                     
                     # 畫中心位置
                     self.comp_center_list.append(comp_center_avg)
-                    cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*comp_lr_center//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
                     # cv.circle(yuv_with_polygons, ((self.frame_width*yolo_center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
 
 
@@ -632,7 +640,8 @@ class MV_on_Vechicle:
                 # cv.imshow("gray", y)
                 # cv.imshow("y", y)
                 # cv.imshow("u", u)
-                cv.imshow("v", v)
+                # cv.imshow("v", v)
+                cv.imshow("average_v", average_v)
                 # cv.imwrite("gray.jpg", y)
                 # cv.imwrite("v.jpg", v)
                 # cv.imwrite("polygons.jpg", yuv_with_polygons)
@@ -669,10 +678,10 @@ class MV_on_Vechicle:
                 # if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
                 #     break
                 
-                outputV = cv.merge((v,v,v))
+                # outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
-                outputStream1.write(outputV)
-                outputStream2.write(cv.merge((average_v, average_v, average_v)))
+                # outputStream1.write(outputV)
+                # outputStream2.write(cv.merge((average_v, average_v, average_v)))
                 # outputStream3.write(cv.merge((diff_v, diff_v, diff_v)))
 
 
@@ -709,7 +718,8 @@ class MV_on_Vechicle:
             seconds = int(execution_time % 60)
             print(f"Execution time: {minutes}min {seconds}sec")
             print("Frame:", frame_id)
-            return
+            print("Ignored Frame:", ignored_frame)
+            # return
 
 
 
