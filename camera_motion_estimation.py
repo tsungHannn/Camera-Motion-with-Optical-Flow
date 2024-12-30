@@ -38,8 +38,7 @@ class MV_on_Vechicle:
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
             
-            # MVS 校正: 如果MVS放歪，偵測結果會歪掉。透過直走一段距離來抓正中間，調整向右、向左的offset讓直走時中心點在正中間
-            self.turning_offset = mvs_data['mv_on_vehicle']['offset']
+            
         
         with open('mvs.yaml', 'r') as file:
             self.mvs_config_lines = file.readlines()
@@ -53,15 +52,15 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\1220\\translation"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/edge"  # mvclab
+        # self.dir_path = "mvs_mp4\\1220\\translation"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
         self.all_file = os.listdir(self.dir_path)
         self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
         # self.all_file = ["test_2024-07-01-02-38-53_mvs_compressed.mp4"] # 0701 edge
-        # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
+        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["2024-11-08-03-32-21_mvs_compressed.mp4"] # 1108 edge
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
@@ -103,6 +102,8 @@ class MV_on_Vechicle:
             self.comp_last_state.append("")
 
         self.calibration_mode = False   # 校正模式，True時開始記錄中心點，直到程式結束或再度按下c
+        # MVS 校正: 如果MVS放歪，偵測結果會歪掉。透過直走一段距離來抓正中間，調整向右、向左的offset讓直走時中心點在正中間
+        self.turning_offset = 0
 
         self.last_center = 20
         self.is_detect = True # 轉彎時不進行物件偵測
