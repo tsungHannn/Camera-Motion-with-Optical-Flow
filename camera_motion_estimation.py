@@ -6,8 +6,10 @@ import matplotlib
 from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 import yaml
-from ultralytics import YOLO
 from utils import KalmanFilter
+from lane_detection import lane_detection, display_lines, find_vanishing_point
+import math
+
 # from sklearn.cluster import DBSCAN
 # from sklearn.cluster import HDBSCAN
 # from hdbscan import HDBSCAN
@@ -37,12 +39,7 @@ class MV_on_Vechicle:
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
             self.distortion_coefficients = np.array(mvs_data['distortion_coefficients']['data'])
             self.distortion_coefficients = self.distortion_coefficients.reshape(1,5)
-            
-            
-        
-        with open('mvs.yaml', 'r') as file:
-            self.mvs_config_lines = file.readlines()
-        
+                    
 
         
         self.window_number = 40
@@ -52,16 +49,16 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\1220\\translation"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
-        self.all_file = os.listdir(self.dir_path)
-        self.all_file = sorted(self.all_file)
+        self.dir_path = "mvs_mp4\\1108\\edge"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
+        # self.all_file = os.listdir(self.dir_path)
+        # self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
         # self.all_file = ["test_2024-03-18-07-57-26_mvs_compressed.mp4"] # 0318
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
         # self.all_file = ["test_2024-07-01-02-38-53_mvs_compressed.mp4"] # 0701 edge
-        self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
-        # self.all_file = ["2024-11-08-03-32-21_mvs_compressed.mp4"] # 1108 edge
+        # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
+        self.all_file = ["2024-11-08-03-36-15_mvs_compressed.mp4"] # 1108 edge
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
@@ -82,7 +79,6 @@ class MV_on_Vechicle:
         self.comp_window_state = []
         self.polygon_list = [] # 畫每個window的範圍
         self.last_state = [] # 方向點數量沒超過閥值的話就使用上一次的結果
-        self.state_buffer = [] # 紀錄之前所有有資訊的window
         self.comp_last_state = []
         self.center_list = [] # 紀錄中央點，畫圖用
         self.comp_center_list = []
@@ -90,23 +86,13 @@ class MV_on_Vechicle:
         self.comp_center_without_avg_list = []
 
 
-        self.record_window_list = [] # 把每一幀window_list存起來，作為相機位置校正用
-        # record_window_list會有(frame_number, window_number)個
-        # 如果影片共有720幀，切成40個window，record_window_list就會是720*40的二維陣列
 
-        self.comp_last_state_time = [] # 紀錄這個window有幾次沒有資訊
         for i in range(self.window_number):
-            self.comp_last_state_time.append(0)
-            self.state_buffer.append([])
             self.last_state.append("")
             self.comp_last_state.append("")
 
-        self.calibration_mode = False   # 校正模式，True時開始記錄中心點，直到程式結束或再度按下c
-        # MVS 校正: 如果MVS放歪，偵測結果會歪掉。透過直走一段距離來抓正中間，調整向右、向左的offset讓直走時中心點在正中間
-        self.turning_offset = 0
-
+        
         self.last_center = 20
-        self.is_detect = True # 轉彎時不進行物件偵測
         self.last_v = None # 如果偵測到y軸波峰，就把整個x軸向量換成上一幀
 
 
@@ -162,148 +148,68 @@ class MV_on_Vechicle:
                 best_index = 0
 
         return best_index
-    
-
-
-    # estimate left or right
-    def calib_estimate(self, img, weight):
-       
-        
-        translation = np.ravel(img) # 把img變為一維
-        
-        right_index = np.where(translation < 128)
-        left_index = np.where(translation > 128)
-
-        
-        self.threshold = img.shape[0]*img.shape[1] * 0.4
-
-        diff = len(right_index[0]) - len(left_index[0])
-
-
-        if diff > self.threshold:
-            return 1 # 向右
-        elif diff < -1 * self.threshold:
-            return -1 * weight # 向左
-        else:
-            return "None"
-        
-    # 相機如果擺歪，偵測到的方向會偏向某一邊。
-    def camera_position_calibration(self):
-        data = np.load("frames.npz", allow_pickle=True)
-        loaded_frames = data["frames"]
-        record_score = {}
-
-        stateMatrix = np.array([[20.0]], dtype=np.float32)
-        estimateCovariance = np.array([[1.0]], dtype=np.float32)
-        transitionMatrix = np.array([[1.0]], dtype=np.float32)
-        processNoiseCov = np.array([[0.01]], dtype=np.float32)
-        measurementStateMatrix = np.array([[0.0]], dtype=np.float32)
-        observationMatrix = np.array([[1.0]], dtype=np.float32)
-        measurementNoiseCov = np.array([[3.0]], dtype=np.float32)
-        kf1 = KalmanFilter(X=stateMatrix,
-                P=estimateCovariance,
-                F=transitionMatrix,
-                Q=processNoiseCov,
-                Z=measurementStateMatrix,
-                H=observationMatrix,
-                R=measurementNoiseCov)
-        
-        for weight in np.arange(0.1, 2.1, 0.1):
             
-            last_state = []
-            center_without_avg_list = []
-            current_score = 0
 
-            for i in range(self.window_number):
-                last_state.append("")
+    def create_dense_optical_flow(self, x_displacement, y_displacement):
+        # Normalize displacement maps: [0, 255] -> [-127, 127]
+        x_flow = x_displacement.astype(np.float32) - 128
+        y_flow = y_displacement.astype(np.float32) - 128
+        
+        # Combine x and y flows into a dense optical flow representation
+        optical_flow = np.zeros((x_displacement.shape[0], x_displacement.shape[1], 2), dtype=np.float32)
+        optical_flow[..., 0] = x_flow  # Horizontal displacement (U)
+        optical_flow[..., 1] = y_flow  # Vertical displacement (V)
+        
+        return optical_flow
 
-            for frame in loaded_frames:
+    def visualize_optical_flow(self, optical_flow):
+        # Convert optical flow to HSV image for visualization
+        h, w = optical_flow.shape[:2]
+        hsv = np.zeros((h, w, 3), dtype=np.uint8)
+        
+        # Compute magnitude and angle of the flow
+        magnitude, angle = cv.cartToPolar(optical_flow[..., 0], optical_flow[..., 1])
+        hsv[..., 0] = angle * 180 / np.pi / 2  # Hue: direction
+        hsv[..., 1] = 255  # Saturation: max
+        hsv[..., 2] = cv.normalize(magnitude, None, 0, 255, cv.NORM_MINMAX)  # Value: magnitude
+        
+        # Convert HSV to RGB for display
+        rgb_flow = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
+        return rgb_flow
+
+
+    def generate_flow_legend(self):
+        # Legend dimensions
+        legend_size = 300  # Diameter of the legend circle
+        radius = legend_size // 2
+        center = (radius, radius)
+        
+        # Create an empty image for the legend
+        legend = np.zeros((legend_size, legend_size, 3), dtype=np.uint8)
+        
+        # Generate HSV values for each pixel
+        for y in range(legend_size):
+            for x in range(legend_size):
+                dx = x - center[0]
+                dy = center[1] - y  # Invert y-axis for proper orientation
+                distance = np.sqrt(dx**2 + dy**2)
+                
+                if distance <= radius:
+                    angle = np.arctan2(dy, dx)  # Angle in radians
+                    magnitude = distance / radius  # Normalize magnitude
                     
-                window_state = []
-                # 如果左右點差距小於閥值，就使用上一次的結果
-                for i in range(self.window_number):
-                    tempAns = self.calib_estimate(frame[i], round(weight, 1))
-
-                    if(tempAns != "None"):
-                        last_state[i] = tempAns
-                        window_state.append(tempAns)
-                    elif(tempAns == "None"):
-                        window_state.append(last_state[i])
-
-
-
-                # 儲存每個window的結果
-                tempRow = []
-                for i in range(self.window_number):
-                    # cv.putText(yuv_with_polygons, str(window_state[i]), (window_width*i+20, 100), self.font, self.fontScale, self.fontColor, self.lineType)
-                    if(window_state[i] == ""):
-                        tempRow.append(0)
-                    else:
-                        tempRow.append(window_state[i])
-
-
-                lr_center = self.find_center(tempRow)
-                center_without_avg_list.append(lr_center)
-
-                # 卡爾曼濾波
-                center_measurement = np.array([[lr_center]], dtype=np.float32)
-                current_prediction = kf1.predict()
-                center_kf1 = int(kf1.correct(center_measurement))
-
-
-                # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-50), 6, (0,0,255), -1)
-                
-                
-                # 20 幀後才開始算
-                if len(center_without_avg_list) >= 20:
-                    center_sum = 0
-
-                    for i in range(1, 21):
-                        center_sum += center_without_avg_list[-i]
-
-                    center_avg = int(center_sum / 20)
+                    # Convert angle and magnitude to HSV
+                    hue = ((angle + np.pi) / (2 * np.pi)) * 180  # Convert radians to degrees
+                    saturation = 255
+                    value = int(magnitude * 255)  # Normalize to 0-255
                     
-
-
-                    center_avg = int((center_avg + center_kf1) / 2) # 卡爾曼濾波 + 移動平均
-
-                    if center_avg == (self.window_number / 2) or center_avg == (self.window_number / 2 - 1): # 最中間
-                        current_score += 5
-                    elif center_avg == (self.window_number / 2 + 1) or center_avg == (self.window_number / 2 - 2): # 旁邊一格
-                        current_score += 4
-                    elif center_avg == (self.window_number / 2 + 2) or center_avg == (self.window_number / 2 - 3): # 旁邊兩格
-                        current_score += 3
-                    elif center_avg == (self.window_number / 2 + 3) or center_avg == (self.window_number / 2 - 4): # 旁邊三格
-                        current_score += 2
-                    elif center_avg == (self.window_number / 2 + 4) or center_avg == (self.window_number / 2 - 5): # 旁邊四格
-                        current_score += 1
-
-
-
-                    # # 把沒有資訊的window遮住
-                    # for i in range(self.window_number):
-                    #     if self.comp_last_state_time[i] > 10:
-                    #         cv.circle(yuv_with_polygons, ((self.frame_width*i//self.window_number)+(window_width//2), window_top-30), 6, (0,0,0), -1)
-
-                
-                    # 畫中心位置
-                    # cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
-                    # cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg_after_calib//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
-                
-            # 紀錄每個weight的分數
-            record_score[round(weight, 1)] = current_score
-
+                    # Assign HSV values
+                    legend[y, x] = (hue, saturation, value)
         
-        count = 0
-        for i in record_score:
-            count += 1
-            print(i, record_score[i])
-        
-        if count != 20:
-            print()
-        
+        # Convert HSV to BGR for visualization
+        legend_bgr = cv.cvtColor(legend, cv.COLOR_HSV2BGR)
+        return legend_bgr
 
-   
     def run(self):
         for file in self.all_file:
             filename = file
@@ -402,7 +308,18 @@ class MV_on_Vechicle:
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
                 y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
-                
+
+
+                # 車道線偵測
+                lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
+                # cv.imshow("lane_detection", lane_image)
+                cv.imshow("gray_with_line", gray_with_line)
+                # # 生成光流圖
+                # dense_flow  = self.create_dense_optical_flow(v, u)
+                # # Visualize optical flow
+                # flow_image = self.visualize_optical_flow(dense_flow)
+                # legend_image = self.generate_flow_legend()
+
                 v_window.insert(0, v)
                 if len(v_window) <= 3:
                     continue
@@ -451,30 +368,11 @@ class MV_on_Vechicle:
                 self.window_state.clear()
                 self.comp_window_state.clear()
 
-                # median_v = v_window[3].copy()
-                # median_v = cv.medianBlur(median_v, 9)
                 average_v = v_window[3].copy()
                 average_v = cv.blur(average_v, (9, 9))
-                # median_v = cv.GaussianBlur(median_v, (9,9), 0)
-                # cv.imshow("median_v", median_v)
-                # cv.imshow("average_v", average_v)
 
-                # 視覺化v_window[3]跟median_v的差別
-                # diff_v = average_v.copy()
-                # diff_v[:] = 0
-                # difference = np.abs(v_window[3].astype(np.int16) - average_v.astype(np.int16))
-                # diff_mask = difference > 20
-                # diff_v[diff_mask] = 255
-                # diff_v[:] = 128
-                # diff_mask = (v_window[3] > 128) & (average_v < 128) # 向左變向右
-                # diff_v[diff_mask] = 255
-                # diff_mask = (v_window[3] < 128) & (average_v > 128) # 向右變向左
-                # diff_v[diff_mask] = 255
-                # diff_mask = (v_window[3] != 128) & (average_v == 128) # 變成128
-                # diff_v[diff_mask] = 255
-                # diff_mask = (v_window[3] == 128) & (average_v != 128) # 變成不是128
-                # diff_v[diff_mask] = 255
-                # cv.imshow("diff", diff_v)
+
+
                 # 直切
                 for i in range(self.window_number):
                     # 經過y軸檢測波峰後，開始檢測移動方向
@@ -502,18 +400,12 @@ class MV_on_Vechicle:
                     color_bgr = (red_value, 30, blue_value)
                     yuv_with_polygons = cv.polylines(yuv_with_polygons, self.polygon_list[i], isClosed=True, color=color_bgr, thickness=2)
                 
-                
-                # 紀錄每個window_list，給相機位置校正用
-                self.record_window_list.append(self.window_list.copy())
 
 
                 # 如果左右點差距小於閥值，就使用上一次的結果
                 for i in range(self.window_number):
                     tempAns = self.estimate(self.window_list[i])
                     comp_tempAns = self.estimate(self.comp_window_list[i])
-
-                    # tempAns = self.calib_estimate(self.window_list[i], 1)
-                    # comp_tempAns = self.calib_estimate(self.comp_window_list[i], 1.9)
 
                     
                     if(tempAns != "None"):
@@ -525,33 +417,8 @@ class MV_on_Vechicle:
                     if(comp_tempAns != "None"):
                         self.comp_last_state[i] = comp_tempAns
                         self.comp_window_state.append(comp_tempAns)
-                        # self.comp_last_state_time[i] = 0
-
-                        # self.state_buffer[i].append(comp_tempAns)
-                        # if len(self.state_buffer[i]) > 5:
-                        #     self.state_buffer[i].pop(0)
 
                     elif(comp_tempAns == "None"):
-                        # 10 幀沒有資訊就不繼續沿用上一幀的結果
-                        # self.comp_last_state_time[i] += 1
-                        # if self.comp_last_state_time[i] > 10:
-                        #     self.comp_window_state.append("")
-                        # else:
-                        #     self.comp_window_state.append(self.comp_last_state[i])
-
-                        # # 沒有資訊的化，使用buffer的結果投票。buffer是紀錄之前有資訊的window
-                        # if len(self.state_buffer[i]) == 5:
-                        #     if self.state_buffer[i].count(1) > self.state_buffer[i].count(-1):
-                        #         self.comp_window_state.append(1)
-                        #     elif self.state_buffer[i].count(1) < self.state_buffer[i].count(-1):
-                        #         self.comp_window_state.append(-1)
-                        #     else:
-                        #         print("Error")
-                        # # buffer沒有5個先前資訊就用上一次有資訊的結果
-                        # else:
-                        #     self.comp_window_state.append(self.comp_last_state[i])
-
-
                         # 沒有資訊就用上一次有資訊的結果
                         self.comp_window_state.append(self.comp_last_state[i])
 
@@ -625,51 +492,11 @@ class MV_on_Vechicle:
                     comp_center_avg = int((comp_center_avg + comp_center_kf2) / 2)
 
 
-                    # # 把沒有資訊的window遮住
-                    # for i in range(self.window_number):
-                    #     if self.comp_last_state_time[i] > 10:
-                    #         cv.circle(yuv_with_polygons, ((self.frame_width*i//self.window_number)+(window_width//2), window_top-30), 6, (0,0,0), -1)
-
-                    
-                    # 相機位置校正
-                    # 先計算目前位置到中間差多少格
-                    
-                    comp_center_avg_after_calib = comp_center_avg - self.turning_offset
-
-                    # 線性插值 y = y_min + (x-x_min) * (y_max - y_min) / (x_max - x_min)
-                    
-                    if self.turning_offset > 0: # 向左移 → 值域會從負的到(40-offset)
-                        # center會沒辦法到最右邊，因為值域只到(40-offset)
-                        # 所以如果center在右側，要插值到[number/2, number-1]之間
-                        if comp_center_avg_after_calib > self.window_number / 2:    
-                            # y_min = number/2; y_max = number-1
-                            # x_min = number/2; x_max = number-1-offset
-                            comp_center_avg_after_calib = (self.window_number / 2) + (comp_center_avg_after_calib-self.window_number/2) * ((self.window_number-1) - (self.window_number/2)) / ((self.window_number-1 - self.turning_offset) - self.window_number/2)
-                    
-                    if self.turning_offset < 0: # 向右移 → 值域會從offset到(40+offset)
-                        # center會沒辦法到最左邊，因為值域只到offset
-                        # 所以如果center在左側，要插值到[0, number/2]之間
-                        if comp_center_avg_after_calib < self.window_number / 2:
-                            # y_min = 0; y_max = number/2
-                            # x_min = 0-offset; x_max = number/2
-                            comp_center_avg_after_calib = 0 + (comp_center_avg_after_calib - (0 - self.turning_offset)) * ((self.window_number/2) - 0) / ((self.window_number/2) - (0 - self.turning_offset))
-
-
-
-                    if comp_center_avg_after_calib > self.window_number - 1:
-                        comp_center_avg_after_calib = self.window_number - 1
-                    if comp_center_avg_after_calib < 0:
-                        comp_center_avg_after_calib = 0
-                    comp_center_avg_after_calib = int(comp_center_avg_after_calib)
-
                     # 畫中心位置
                     cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
-                    cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg_after_calib//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
-                    
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
                     
 
-                    if self.calibration_mode == True:
-                        self.center_list.append(center_avg)
                     
 
                     
@@ -687,9 +514,21 @@ class MV_on_Vechicle:
 
                 # cv.putText(yuv_with_polygons, str(realMotion), (260,400), self.font, self.fontScale, (0, 0, 255), self.lineType)
 
-                if self.calibration_mode == True:
-                    cv.circle(yuv_with_polygons, (10, 10), 5, (0, 0, 255), -1)
                 cv.putText(yuv_with_polygons, str(frame_id), (590, 20), self.font, 0.5, (0, 0, 255), 1)
+
+                # 車道線偵測結果畫進MV on Vehicle
+                # 車道線偵測結果
+                vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
+                cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                
+                if len(average_line) == 2:  # 確保有兩條車道線
+                    vanishing_point = find_vanishing_point(average_line[0], average_line[1])
+                    if vanishing_point != (-1, -1):
+                        cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
+
+                line_image = display_lines(yuv_with_polygons, average_line)
+                yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
+                
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
                 # u = cv.cvtColor(u, cv.COLOR_GRAY2BGR)
@@ -706,6 +545,10 @@ class MV_on_Vechicle:
                 # cv.imshow("v", v)
                 cv.imshow("average_v", average_v)
                 cv.imwrite("gray.jpg", y)
+                # cv.imshow("Optical Flow", flow_image)
+                # cv.imwrite("optical_flow.png", flow_image)
+                # cv.imshow("legend", legend_image)
+                # cv.imwrite("legend.png", legend_image)
                 # cv.imwrite("v.jpg", v)
                 # cv.imwrite("polygons.jpg", yuv_with_polygons)
                 # for i in range(self.window_number):
@@ -747,20 +590,14 @@ class MV_on_Vechicle:
                 # # 不用 YOLO 偵測的話會跑太快
                 # if cv.waitKey(1000//frameRate) & 0xFF == ord('q'):
                 #     break
-                
-                # # calibration mode
-                # if cv.waitKey() & 0xFF == ord('c'):
-                #     if self.calibration_mode == True:
-                #         self.calibration_mode = False
-                #     elif self.calibration_mode == False:
-                #         self.calibration_mode = True
 
 
-                # outputV = cv.merge((v,v,v))
+
+                outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
-                # outputStream1.write(outputV)
-                # outputStream2.write(cv.merge((average_v, average_v, average_v)))
-                # outputStream3.write(cv.merge((diff_v, diff_v, diff_v)))
+                outputStream1.write(outputV)
+                outputStream2.write(lane_image)
+                outputStream3.write(gray_with_line)
 
 
                 # if frame_id == 44:
@@ -773,17 +610,7 @@ class MV_on_Vechicle:
 
                 frame_id += 1
 
-                
-            # calib_center = np.average(self.center_list)
-            # self.turning_offset = (calib_center - (self.window_number / 2)) / self.window_number
 
-            # # 為了不修改mvs.yaml的格式，只能這樣修改瞜
-            # for i, line in enumerate(self.mvs_config_lines):
-            #     if 'offset:' in line:
-            #         self.mvs_config_lines[i] = f'  offset: {self.turning_offset}\n'
-            # # 寫回 YAML 文件
-            # with open('test.yaml', 'w') as file:
-            #     file.writelines(self.mvs_config_lines)
 
             # u_plot1 = np.array(u_plot1)
             # peaks, _ = find_peaks(u_plot1, prominence=2)
@@ -799,7 +626,7 @@ class MV_on_Vechicle:
             outputResult.release()
             outputStream1.release()
             outputStream2.release()
-            outputStream3.release()
+            # outputStream3.release()
             end_time = time.time()
             execution_time = end_time - start_time
             minutes = int(execution_time // 60)
@@ -807,7 +634,6 @@ class MV_on_Vechicle:
             print(f"Execution time: {minutes}min {seconds}sec")
             print("Frame:", frame_id)
             print("Ignored Frame:", ignored_frame)
-            np.savez_compressed("frames.npz", frames=self.record_window_list)
             # return
 
 
@@ -816,7 +642,6 @@ if __name__ == "__main__":
 
     detector = MV_on_Vechicle()
     detector.run()
-    # detector.camera_position_calibration()
     # plt.cla()
 
     # plt.plot()
