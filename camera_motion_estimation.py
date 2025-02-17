@@ -7,8 +7,10 @@ from matplotlib import pyplot as plt
 from scipy.signal import find_peaks
 import yaml
 from utils import KalmanFilter
-from lane_detection import lane_detection, display_lines, find_vanishing_point
+from lane_detection import lane_detection, display_lines, find_vanishing_point_by_lane
 import math
+import collections
+from optical_flow_find_vp import *
 
 # from sklearn.cluster import DBSCAN
 # from sklearn.cluster import HDBSCAN
@@ -49,8 +51,8 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\1108\\edge"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/0701/gray"  # mvclab
+        # self.dir_path = "mvs_mp4\\1108\\edge"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/edge"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
@@ -58,7 +60,7 @@ class MV_on_Vechicle:
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
         # self.all_file = ["test_2024-07-01-02-38-53_mvs_compressed.mp4"] # 0701 edge
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
-        self.all_file = ["2024-11-08-03-36-15_mvs_compressed.mp4"] # 1108 edge
+        self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
@@ -84,6 +86,12 @@ class MV_on_Vechicle:
         self.comp_center_list = []
         self.center_without_avg_list = []
         self.comp_center_without_avg_list = []
+
+
+
+        # 設定一個歷史記錄隊列來存過去幾幀的消失點
+        history_size = 5  # 記錄過去 5 幀的結果
+        self.vp_history = collections.deque(maxlen=history_size)
 
 
 
@@ -150,66 +158,7 @@ class MV_on_Vechicle:
         return best_index
             
 
-    def create_dense_optical_flow(self, x_displacement, y_displacement):
-        # Normalize displacement maps: [0, 255] -> [-127, 127]
-        x_flow = x_displacement.astype(np.float32) - 128
-        y_flow = y_displacement.astype(np.float32) - 128
-        
-        # Combine x and y flows into a dense optical flow representation
-        optical_flow = np.zeros((x_displacement.shape[0], x_displacement.shape[1], 2), dtype=np.float32)
-        optical_flow[..., 0] = x_flow  # Horizontal displacement (U)
-        optical_flow[..., 1] = y_flow  # Vertical displacement (V)
-        
-        return optical_flow
-
-    def visualize_optical_flow(self, optical_flow):
-        # Convert optical flow to HSV image for visualization
-        h, w = optical_flow.shape[:2]
-        hsv = np.zeros((h, w, 3), dtype=np.uint8)
-        
-        # Compute magnitude and angle of the flow
-        magnitude, angle = cv.cartToPolar(optical_flow[..., 0], optical_flow[..., 1])
-        hsv[..., 0] = angle * 180 / np.pi / 2  # Hue: direction
-        hsv[..., 1] = 255  # Saturation: max
-        hsv[..., 2] = cv.normalize(magnitude, None, 0, 255, cv.NORM_MINMAX)  # Value: magnitude
-        
-        # Convert HSV to RGB for display
-        rgb_flow = cv.cvtColor(hsv, cv.COLOR_HSV2BGR)
-        return rgb_flow
-
-
-    def generate_flow_legend(self):
-        # Legend dimensions
-        legend_size = 300  # Diameter of the legend circle
-        radius = legend_size // 2
-        center = (radius, radius)
-        
-        # Create an empty image for the legend
-        legend = np.zeros((legend_size, legend_size, 3), dtype=np.uint8)
-        
-        # Generate HSV values for each pixel
-        for y in range(legend_size):
-            for x in range(legend_size):
-                dx = x - center[0]
-                dy = center[1] - y  # Invert y-axis for proper orientation
-                distance = np.sqrt(dx**2 + dy**2)
-                
-                if distance <= radius:
-                    angle = np.arctan2(dy, dx)  # Angle in radians
-                    magnitude = distance / radius  # Normalize magnitude
-                    
-                    # Convert angle and magnitude to HSV
-                    hue = ((angle + np.pi) / (2 * np.pi)) * 180  # Convert radians to degrees
-                    saturation = 255
-                    value = int(magnitude * 255)  # Normalize to 0-255
-                    
-                    # Assign HSV values
-                    legend[y, x] = (hue, saturation, value)
-        
-        # Convert HSV to BGR for visualization
-        legend_bgr = cv.cvtColor(legend, cv.COLOR_HSV2BGR)
-        return legend_bgr
-
+    
     def run(self):
         for file in self.all_file:
             filename = file
@@ -307,18 +256,67 @@ class MV_on_Vechicle:
                 # cv.imwrite("after.jpg", nxt)
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
 
-                y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量
+                down_sample_size = 2
+                down_sample_yuv = yuv.copy()
+                down_sample_yuv = cv.resize(down_sample_yuv, (self.frame_width // down_sample_size, self.frame_height // down_sample_size), interpolation=cv.INTER_CUBIC)
+                y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量    
+
+                down_sample_y, down_sample_u, down_sample_v = cv.split(down_sample_yuv)
+
+                # # 車道線偵測
+                # lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
+                # # cv.imshow("lane_detection", lane_image)
+                # cv.imshow("gray_with_line", gray_with_line)
 
 
-                # 車道線偵測
-                lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
-                # cv.imshow("lane_detection", lane_image)
-                cv.imshow("gray_with_line", gray_with_line)
-                # # 生成光流圖
-                # dense_flow  = self.create_dense_optical_flow(v, u)
-                # # Visualize optical flow
-                # flow_image = self.visualize_optical_flow(dense_flow)
+                # 生成光流圖
+                dense_flow  = create_dense_optical_flow(down_sample_v, down_sample_u)
+                # filter_dense_flow = self.filter_optical_flow_ransac(dense_flow, sampling_step=10)
+                
+
+                # test_flow = np.array([
+                #         [[0, 0], [0, 0], [0, 0]],
+                #         [[0, 0], [0, 0], [0, 0]],
+                #         [[-1, 1], [0, 0], [0, 0]]], dtype=np.float32)
+
+
+                # 計算經過次數
+                line_count, line_visual = draw_infinite_lines(dense_flow)
+    
+                # 正規化數據以便顯示
+                norm_line_count = cv.normalize(line_count, None, 0, 255, cv.NORM_MINMAX, dtype=cv.CV_8U)
+                # 顯示結果
+                fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+                
+                
+
+                # test_vanishing_point, vis, intersections = find_vanishing_point_by_optical_flow(dense_flow)
+                # vis_intersection = np.zeros_like(vis)
+                # for intersection in intersections:
+                #     cv.circle(vis_intersection, tuple(intersection), 2, (0, 0, 255), -1)
+                # cv.imshow("Intersection", vis_intersection)
+                # 繪製消失點
+                # if tuple(test_vanishing_point) != (-1, -1):
+                    # test_vanishing_point = self.smooth_vanishing_point(test_vanishing_point[0], test_vanishing_point[1])
+                    # cv.circle(vis, tuple(test_vanishing_point), 5, (0, 0, 255), -1)
+                # cv.imshow("Vanishing Point", vis)
+
+
+
+
+                # Visualize optical flow
+                flow_image = visualize_optical_flow(dense_flow)
                 # legend_image = self.generate_flow_legend()
+                
+                axes[0].imshow(line_count, cmap='hot', interpolation='nearest')
+                axes[0].set_title('Pixel Line Coverage')
+                
+                axes[1].imshow(cv.cvtColor(flow_image, cv.COLOR_BGR2RGB))
+                axes[1].set_title('Flow Image')
+                
+                plt.show()
+
+
 
                 v_window.insert(0, v)
                 if len(v_window) <= 3:
@@ -516,18 +514,25 @@ class MV_on_Vechicle:
 
                 cv.putText(yuv_with_polygons, str(frame_id), (590, 20), self.font, 0.5, (0, 0, 255), 1)
 
-                # 車道線偵測結果畫進MV on Vehicle
-                # 車道線偵測結果
-                vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
-                cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
-                
-                if len(average_line) == 2:  # 確保有兩條車道線
-                    vanishing_point = find_vanishing_point(average_line[0], average_line[1])
-                    if vanishing_point != (-1, -1):
-                        cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
+                # # 光流偵測消失點
+                # vanishing_point_x = tuple(test_vanishing_point)[0]
+                # vanishing_point_y = tuple(test_vanishing_point)[1]
 
-                line_image = display_lines(yuv_with_polygons, average_line)
-                yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
+                # cv.circle(yuv_with_polygons, (vanishing_point_x * down_sample_size, vanishing_point_y * down_sample_size), 6, (0, 0, 255), -1)
+
+
+                # # 車道線偵測結果畫進MV on Vehicle
+                # # 車道線偵測結果
+                # vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
+                # cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                
+                # if len(average_line) == 2:  # 確保有兩條車道線
+                #     vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
+                #     if vanishing_point != (-1, -1):
+                #         cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
+
+                # line_image = display_lines(yuv_with_polygons, average_line)
+                # yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
                 
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
@@ -596,8 +601,8 @@ class MV_on_Vechicle:
                 outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
                 outputStream1.write(outputV)
-                outputStream2.write(lane_image)
-                outputStream3.write(gray_with_line)
+                # outputStream2.write(lane_image)
+                # outputStream3.write(gray_with_line)
 
 
                 # if frame_id == 44:

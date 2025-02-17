@@ -111,7 +111,7 @@ def display_lines(image, lines):
             cv2.line(line_image, (x1, y1), (x2, y2), (255, 0, 0), 10)
     return line_image 
 
-def find_vanishing_point(left_line, right_line):
+def find_vanishing_point_by_lane(left_line, right_line):
     if left_line is None or right_line is None or len(left_line) == 0 or len(right_line) == 0:
         return None  # 如果缺少任何一條線，無法計算
 
@@ -166,7 +166,7 @@ def lane_detection(image):
 
     vanishing_point = (-1, -1)
     if len(averaged_lines) == 2:  # 確保有兩條車道線
-        vanishing_point = find_vanishing_point(averaged_lines[0], averaged_lines[1])
+        vanishing_point = find_vanishing_point_by_lane(averaged_lines[0], averaged_lines[1])
         if vanishing_point != (-1, -1):
             cv2.circle(combo_image, vanishing_point, 5, (0, 255, 0), -1)  # 用綠色標示焦點
 
