@@ -25,11 +25,11 @@ def region_of_int(image):
     width = image.shape[1]
     #Coordinates of the triangular region
 
-    bottom_left  = [0, height]
-    top_left     = [width*0.45, height*0.5]
+    bottom_left  = [width*0.1, height]
+    top_left     = [width*0.45, height*0.55]
     # bottom_right = [cols*0.95, rows]
-    bottom_right = [width, height]
-    top_right    = [width*0.55, height*0.5] 
+    bottom_right = [width*0.9, height]
+    top_right    = [width*0.55, height*0.55] 
     polygons = np.array([
         [bottom_left, top_left, top_right, bottom_right]
     ], dtype=np.int32)
