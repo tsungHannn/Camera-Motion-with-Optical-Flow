@@ -521,18 +521,18 @@ class MV_on_Vechicle:
                 # cv.circle(yuv_with_polygons, (vanishing_point_x * down_sample_size, vanishing_point_y * down_sample_size), 6, (0, 0, 255), -1)
 
 
-                # # 車道線偵測結果畫進MV on Vehicle
-                # # 車道線偵測結果
-                # vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
-                # cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                # 車道線偵測結果畫進MV on Vehicle
+                # 車道線偵測結果
+                vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
+                cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
                 
-                # if len(average_line) == 2:  # 確保有兩條車道線
-                #     vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
-                #     if vanishing_point != (-1, -1):
-                #         cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
+                if len(average_line) == 2:  # 確保有兩條車道線
+                    vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
+                    if vanishing_point != (-1, -1):
+                        cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
 
-                # line_image = display_lines(yuv_with_polygons, average_line)
-                # yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
+                line_image = display_lines(yuv_with_polygons, average_line)
+                yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
                 
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
