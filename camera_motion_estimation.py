@@ -52,7 +52,7 @@ class MV_on_Vechicle:
 
 		# specify directory and file name
         # self.dir_path = "mvs_mp4\\1108\\edge"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/edge"  # mvclab
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/gray"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
@@ -60,7 +60,7 @@ class MV_on_Vechicle:
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
         # self.all_file = ["test_2024-07-01-02-38-53_mvs_compressed.mp4"] # 0701 edge
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
-        self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge
+        self.all_file = ["2024-11-08-05-16-48_mvs_compressed.mp4"] # 1108 edge
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
@@ -263,10 +263,10 @@ class MV_on_Vechicle:
 
                 down_sample_y, down_sample_u, down_sample_v = cv.split(down_sample_yuv)
 
-                # # 車道線偵測
-                # lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
-                # # cv.imshow("lane_detection", lane_image)
-                # cv.imshow("gray_with_line", gray_with_line)
+                # 車道線偵測
+                lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
+                # cv.imshow("lane_detection", lane_image)
+                cv.imshow("gray_with_line", gray_with_line)
 
 
                 # 生成光流圖
@@ -280,13 +280,13 @@ class MV_on_Vechicle:
                 #         [[-1, 1], [0, 0], [0, 0]]], dtype=np.float32)
 
 
-                # 計算經過次數
-                line_count, line_visual = draw_infinite_lines(dense_flow)
+                # # 計算經過次數
+                # line_count, line_visual = draw_infinite_lines(dense_flow)
     
-                # 正規化數據以便顯示
-                norm_line_count = cv.normalize(line_count, None, 0, 255, cv.NORM_MINMAX, dtype=cv.CV_8U)
-                # 顯示結果
-                fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+                # # 正規化數據以便顯示
+                # norm_line_count = cv.normalize(line_count, None, 0, 255, cv.NORM_MINMAX, dtype=cv.CV_8U)
+                # # 顯示結果
+                # fig, axes = plt.subplots(1, 2, figsize=(10, 5))
                 
                 
 
@@ -304,17 +304,17 @@ class MV_on_Vechicle:
 
 
 
-                # Visualize optical flow
-                flow_image = visualize_optical_flow(dense_flow)
-                # legend_image = self.generate_flow_legend()
+                # # Visualize optical flow
+                # flow_image = visualize_optical_flow(dense_flow)
+                # # legend_image = self.generate_flow_legend()
                 
-                axes[0].imshow(line_count, cmap='hot', interpolation='nearest')
-                axes[0].set_title('Pixel Line Coverage')
+                # axes[0].imshow(line_count, cmap='hot', interpolation='nearest')
+                # axes[0].set_title('Pixel Line Coverage')
                 
-                axes[1].imshow(cv.cvtColor(flow_image, cv.COLOR_BGR2RGB))
-                axes[1].set_title('Flow Image')
+                # axes[1].imshow(cv.cvtColor(flow_image, cv.COLOR_BGR2RGB))
+                # axes[1].set_title('Flow Image')
                 
-                plt.show()
+                # plt.show()
 
 
 

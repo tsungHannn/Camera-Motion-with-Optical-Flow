@@ -26,10 +26,10 @@ def region_of_int(image):
     #Coordinates of the triangular region
 
     bottom_left  = [0, height]
-    top_left     = [width*0.35, height*0.5]
+    top_left     = [width*0.45, height*0.5]
     # bottom_right = [cols*0.95, rows]
     bottom_right = [width, height]
-    top_right    = [width*0.65, height*0.5] 
+    top_right    = [width*0.55, height*0.5] 
     polygons = np.array([
         [bottom_left, top_left, top_right, bottom_right]
     ], dtype=np.int32)
@@ -38,7 +38,7 @@ def region_of_int(image):
     roi = image.copy()
     # roi = cv2.cvtColor(roi, cv2.COLOR_GRAY2BGR)
     roi = cv2.polylines(roi,vertices, True, (0,0,255), 10)
-    # cv2.imshow("roi", roi)
+    cv2.imshow("roi", roi)
 
     # polygons = np.array([
     #     [(0,height * 0.5), (width, height * 0.5), (width, height), (0, height)]
@@ -223,7 +223,7 @@ if __name__ == "__main__":
             combo_image = cv2.addWeighted(frame, 0.8, line_image, 1, 1)
 
             if len(averaged_lines) == 2:  # 確保有兩條車道線
-                vanishing_point = find_vanishing_point(averaged_lines[0], averaged_lines[1])
+                vanishing_point = find_vanishing_point_by_lane(averaged_lines[0], averaged_lines[1])
                 if vanishing_point:
                     cv2.circle(combo_image, vanishing_point, 5, (0, 255, 0), -1)  # 用綠色標示焦點
 
