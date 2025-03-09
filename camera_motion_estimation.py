@@ -51,8 +51,8 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        # self.dir_path = "mvs_mp4\\1108\\edge"
-        self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/gray"  # mvclab
+        self.dir_path = "mvs_mp4\\1108\\edge"
+        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/gray"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
@@ -60,7 +60,9 @@ class MV_on_Vechicle:
         # self.all_file = ["test_2024-05-21-08-08-41_mvs_compressed.mp4"] # 0521
         # self.all_file = ["test_2024-07-01-02-38-53_mvs_compressed.mp4"] # 0701 edge
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
-        self.all_file = ["2024-11-08-05-16-48_mvs_compressed.mp4"] # 1108 edge
+        # self.all_file = ["2024-11-08-05-16-48_mvs_compressed.mp4"] # 1108 gray 換車道
+        # self.all_file = ["2024-11-08-03-31-43_mvs_compressed.mp4"] # 1108 edge 換車道
+        self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge 巷子裡
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
@@ -255,7 +257,8 @@ class MV_on_Vechicle:
                 # cv.imshow("after", nxt)
                 # cv.imwrite("after.jpg", nxt)
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
-
+                # yuv = nxt.copy()
+                cv.imshow("yuv", yuv)
                 down_sample_size = 2
                 down_sample_yuv = yuv.copy()
                 down_sample_yuv = cv.resize(down_sample_yuv, (self.frame_width // down_sample_size, self.frame_height // down_sample_size), interpolation=cv.INTER_CUBIC)
@@ -465,6 +468,12 @@ class MV_on_Vechicle:
                 current_prediction = kf1.predict()
                 center_kf1 = int(kf1.correct(center_measurement))
 
+                # 車道線偵測結果整合
+                if vanishing_point != (-1, -1):
+                    vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
+                    # cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                    comp_lr_center = int((comp_lr_center + vanishing_point_in_window) / 2)
+
                 comp_center_measurement = np.array([[comp_lr_center]], dtype=np.float32)
                 current_prediction = kf2.predict()
                 comp_center_kf2 = int(kf2.correct(comp_center_measurement))
@@ -472,29 +481,33 @@ class MV_on_Vechicle:
                 # cv.circle(yuv_with_polygons, ((self.frame_width*corrected_state//self.window_number)+(window_width//2), window_top-50), 6, (0,0,255), -1)
                 
                 
-                # 20 幀後才開始算
-                if len(self.center_without_avg_list) >= 20:
-                    center_sum = 0
-                    comp_center_sum = 0
+                # # 20 幀後才開始算
+                # if len(self.center_without_avg_list) >= 20:
+                #     center_sum = 0
+                #     comp_center_sum = 0
 
-                    for i in range(1, 21):
-                        center_sum += self.center_without_avg_list[-i]
-                        comp_center_sum += self.comp_center_without_avg_list[-i]
+                #     for i in range(1, 21):
+                #         center_sum += self.center_without_avg_list[-i]
+                #         comp_center_sum += self.comp_center_without_avg_list[-i]
 
-                    center_avg = int(center_sum / 20)
-                    comp_center_avg = int(comp_center_sum / 20)
+                #     center_avg = int(center_sum / 20)
+                #     comp_center_avg = int(comp_center_sum / 20)
+
+                    
+                    
+                #     center_avg = int((center_avg + center_kf1) / 2) # 卡爾曼濾波 + 移動平均
+                #     comp_center_avg = int((comp_center_avg + comp_center_kf2) / 2)
+
+
                     
 
-
-                    center_avg = int((center_avg + center_kf1) / 2) # 卡爾曼濾波 + 移動平均
-                    comp_center_avg = int((comp_center_avg + comp_center_kf2) / 2)
-
-
-                    # 畫中心位置
-                    cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
-                    # cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
+                #     # 畫中心位置
+                #     cv.circle(yuv_with_polygons, ((self.frame_width*center_avg//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
+                #     cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_avg//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
                     
 
+                cv.circle(yuv_with_polygons, ((self.frame_width*center_kf1//self.window_number)+(window_width//2), window_top-30), 6, (31, 198, 0), -1)
+                cv.circle(yuv_with_polygons, ((self.frame_width*comp_center_kf2//self.window_number)+(window_width//2), window_top-50), 6, (0, 0, 255), -1)
                     
 
                     
@@ -521,10 +534,7 @@ class MV_on_Vechicle:
                 # cv.circle(yuv_with_polygons, (vanishing_point_x * down_sample_size, vanishing_point_y * down_sample_size), 6, (0, 0, 255), -1)
 
 
-                # 車道線偵測結果畫進MV on Vehicle
-                # 車道線偵測結果
-                vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
-                cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                
                 
                 if len(average_line) == 2:  # 確保有兩條車道線
                     vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
@@ -601,8 +611,8 @@ class MV_on_Vechicle:
                 outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
                 outputStream1.write(outputV)
-                # outputStream2.write(lane_image)
-                # outputStream3.write(gray_with_line)
+                outputStream2.write(lane_image)
+                outputStream3.write(gray_with_line)
 
 
                 # if frame_id == 44:

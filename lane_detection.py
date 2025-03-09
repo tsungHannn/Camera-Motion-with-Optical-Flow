@@ -25,11 +25,20 @@ def region_of_int(image):
     width = image.shape[1]
     #Coordinates of the triangular region
 
-    bottom_left  = [width*0.1, height]
-    top_left     = [width*0.45, height*0.55]
-    # bottom_right = [cols*0.95, rows]
-    bottom_right = [width*0.9, height]
-    top_right    = [width*0.55, height*0.55] 
+    # 比較大的ROI
+    bottom_left  = [0, height]
+    top_left     = [width*0.4, height*0.55]
+    bottom_right = [width, height]
+    top_right    = [width*0.6, height*0.55]
+
+    # # 比較小的ROI
+    # bottom_left  = [width*0.1, height]
+    # top_left     = [width*0.45, height*0.55]
+    # # bottom_right = [cols*0.95, rows]
+    # bottom_right = [width*0.9, height]
+    # top_right    = [width*0.55, height*0.55] 
+
+
     polygons = np.array([
         [bottom_left, top_left, top_right, bottom_right]
     ], dtype=np.int32)
@@ -143,10 +152,10 @@ def lane_detection(image):
     c1 = canny(image)
     cropped_image, _ = region_of_int(c1)
     _, roi = region_of_int(image)
-    # cv2.imshow("roi", roi)
+    cv2.imshow("roi", roi)
     
 
-    lines = cv2.HoughLinesP(cropped_image, 2, np.pi/180, 100, np.array([]), minLineLength=50,maxLineGap=10)
+    lines = cv2.HoughLinesP(cropped_image, 2, np.pi/180, 100, np.array([]), minLineLength=10,maxLineGap=10)
     filtered_lines = [] # 濾除水平的線段
     if lines is not None:
         for line in lines:
