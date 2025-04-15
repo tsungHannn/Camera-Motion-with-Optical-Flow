@@ -51,7 +51,7 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\1108\\edge"
+        self.dir_path = "mvs_mp4\\20250407\\flipped_videos"
         # self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/gray"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
@@ -62,8 +62,9 @@ class MV_on_Vechicle:
         # self.all_file = ["test_2024-07-01-02-33-02_mvs_compressed.mp4"] # 0701 gray
         # self.all_file = ["2024-11-08-05-16-48_mvs_compressed.mp4"] # 1108 gray 換車道
         # self.all_file = ["2024-11-08-03-31-43_mvs_compressed.mp4"] # 1108 edge 換車道
-        self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge 巷子裡
+        # self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge 巷子裡
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
+        self.all_file = ["flipped_10_mvs_compressed.mp4"] # 20250407
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
 
@@ -179,7 +180,7 @@ class MV_on_Vechicle:
             codec = cv.VideoWriter_fourcc(*'mp4v')
             save_name = "motion_" + filename[:-4] + ".mp4"
             outputResult = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-            outputStream1 = cv.VideoWriter("output1.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
+            outputStream1 = cv.VideoWriter("output1.mp4", codec, frameRate, (int(cap.get(3) // 2),int(cap.get(4) // 2)))
             outputStream2 = cv.VideoWriter("output2.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             outputStream3 = cv.VideoWriter("output3.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             # initialise text variables to draw on frames
@@ -251,29 +252,49 @@ class MV_on_Vechicle:
                 if not ret:
                     break
                 
-                # cv.imshow("before", nxt)
-                
-                nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
+                cv.imshow("original", nxt)
+
+                # nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
+
+
                 # cv.imshow("after", nxt)
                 # cv.imwrite("after.jpg", nxt)
                 yuv = cv.cvtColor(nxt.copy(), cv.COLOR_RGB2YUV)
                 # yuv = nxt.copy()
-                cv.imshow("yuv", yuv)
-                down_sample_size = 2
-                down_sample_yuv = yuv.copy()
-                down_sample_yuv = cv.resize(down_sample_yuv, (self.frame_width // down_sample_size, self.frame_height // down_sample_size), interpolation=cv.INTER_CUBIC)
+                # cv.imshow("yuv", yuv)
+                # down_sample_size = 2
+                # down_sample_yuv = yuv.copy()
+                # down_sample_yuv = cv.resize(down_sample_yuv, (self.frame_width // down_sample_size, self.frame_height // down_sample_size), interpolation=cv.INTER_CUBIC)
                 y, u, v = cv.split(yuv) # 不知道為啥 v看起來才是水平向量    
 
-                down_sample_y, down_sample_u, down_sample_v = cv.split(down_sample_yuv)
+
+                # 處理雙目MVS
+                left_edge = y[self.frame_height // 2:self.frame_height, 0:self.frame_width // 2]
+                right_edge = y[self.frame_height // 2:self.frame_height, self.frame_width // 2:self.frame_width]
+                left_u = u[0:self.frame_height // 2, 0:self.frame_width // 2] 
+                left_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
+                right_u = u[0:self.frame_height // 2, 0:self.frame_width // 2]
+                right_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
+
+                nxt = cv.merge([left_edge, left_u, left_v])
+                nxt = cv.cvtColor(nxt, cv.COLOR_YUV2RGB)
+                nxt = cv.cvtColor(nxt, cv.COLOR_RGB2BGR)
+                # nxt = cv.resize(nxt, (self.frame_width, self.frame_height), interpolation=cv.INTER_CUBIC)
+                cv.imshow("nxt", nxt)
+                outputStream1.write(nxt)
+
+
+
+                # down_sample_y, down_sample_u, down_sample_v = cv.split(down_sample_yuv)
 
                 # 車道線偵測
-                lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
+                # lane_image, gray_with_line, average_line, vanishing_point = lane_detection(cv.merge((y, y, y)))
                 # cv.imshow("lane_detection", lane_image)
-                cv.imshow("gray_with_line", gray_with_line)
+                # cv.imshow("gray_with_line", gray_with_line)
 
 
                 # 生成光流圖
-                dense_flow  = create_dense_optical_flow(down_sample_v, down_sample_u)
+                # dense_flow  = create_dense_optical_flow(down_sample_v, down_sample_u)
                 # filter_dense_flow = self.filter_optical_flow_ransac(dense_flow, sampling_step=10)
                 
 
@@ -468,11 +489,30 @@ class MV_on_Vechicle:
                 current_prediction = kf1.predict()
                 center_kf1 = int(kf1.correct(center_measurement))
 
-                # 車道線偵測結果整合
-                if vanishing_point != (-1, -1):
-                    vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
-                    # cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
-                    comp_lr_center = int((comp_lr_center + vanishing_point_in_window) / 2)
+                # # 車道線偵測結果整合
+                # vanishing_point_range_x_min = int(self.frame_width * 0.2)
+                # vanishing_point_range_x_max = int(self.frame_width * 0.8)
+                # vanishing_point_range_y_min = int(self.frame_height * 0.4)
+                # vanishing_point_range_y_max = int(self.frame_height * 0.6)
+                
+                # cv.rectangle(yuv_with_polygons, (vanishing_point_range_x_min, vanishing_point_range_y_min), (vanishing_point_range_x_max, vanishing_point_range_y_max), (255, 0, 0), 2)
+
+                # 車道線偵測消失點
+                # if vanishing_point != (-1, -1):
+                #     if vanishing_point[0] >= vanishing_point_range_x_min and vanishing_point[0] <= vanishing_point_range_x_max and vanishing_point[1] <= vanishing_point_range_y_max and vanishing_point[1] >= vanishing_point_range_y_min:
+                #         vanishing_point_in_window = math.floor(vanishing_point[0] / (self.frame_width//self.window_number))
+                #         # cv.circle(yuv_with_polygons, ((self.frame_width*vanishing_point_in_window//self.window_number)+(window_width//2), window_top-50), 6, (255, 0, 0), -1)
+                #         comp_lr_center = int((comp_lr_center + vanishing_point_in_window) / 2)
+
+                #         # 畫車道線
+                #         vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
+                #         cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
+
+                #     else:
+                #         # 畫車道線
+                #         vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
+                #         cv.circle(yuv_with_polygons, vanishing_point, 6, (0, 255, 255), -1)  # 用黃色標示焦點
+
 
                 comp_center_measurement = np.array([[comp_lr_center]], dtype=np.float32)
                 current_prediction = kf2.predict()
@@ -534,15 +574,9 @@ class MV_on_Vechicle:
                 # cv.circle(yuv_with_polygons, (vanishing_point_x * down_sample_size, vanishing_point_y * down_sample_size), 6, (0, 0, 255), -1)
 
 
-                
-                
-                if len(average_line) == 2:  # 確保有兩條車道線
-                    vanishing_point = find_vanishing_point_by_lane(average_line[0], average_line[1])
-                    if vanishing_point != (-1, -1):
-                        cv.circle(yuv_with_polygons, vanishing_point, 6, (255, 0, 0), -1)  # 用藍色標示焦點
 
-                line_image = display_lines(yuv_with_polygons, average_line)
-                yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
+                # line_image = display_lines(yuv_with_polygons, average_line)
+                # yuv_with_polygons = cv.addWeighted(yuv_with_polygons, 0.8, line_image, 1, 1)
                 
 
                 y = cv.cvtColor(y, cv.COLOR_GRAY2BGR)
@@ -595,10 +629,7 @@ class MV_on_Vechicle:
                 key = cv.waitKey(25)
                 if key == ord('q'):
                     break
-                elif key == ord('c'):
-                    if len(self.center_without_avg_list) >= 20:
-                        self.turning_offset = comp_center_avg - (self.window_number / 2)
-                        print("offset:", self.turning_offset)
+                
 
                 # if cv.waitKey(25) & 0xFF == ord('q'):
                 #     break
@@ -608,11 +639,11 @@ class MV_on_Vechicle:
 
 
 
-                outputV = cv.merge((v,v,v))
+                # outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
-                outputStream1.write(outputV)
-                outputStream2.write(lane_image)
-                outputStream3.write(gray_with_line)
+                # outputStream1.write(nxt)
+                # outputStream2.write(nxt)
+                # outputStream3.write(gray_with_line)
 
 
                 # if frame_id == 44:
