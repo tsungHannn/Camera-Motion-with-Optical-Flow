@@ -1,7 +1,7 @@
 import numpy as np
 import cv2 as cv
 from sklearn.linear_model import RANSACRegressor
-from skimage.draw import line
+# from skimage.draw import line
 
 def create_dense_optical_flow(x_displacement, y_displacement):
         # Normalize displacement maps: [0, 255] -> [-127, 127]
