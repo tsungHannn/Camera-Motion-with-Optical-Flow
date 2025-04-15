@@ -12,12 +12,12 @@ from mediapipe.framework.formats import landmark_pb2
 
 # Open the USB camera (usually 0 or 1 for the first camera, 2 or higher for additional cameras)
 # If you have multiple cameras, try changing the index (0, 1, 2, etc.)
-camera_index = 2
+camera_index = 1
 mvs = True
 mp_hands = mp.solutions.hands
 mp_drawing = mp.solutions.drawing_utils
 mp_drawing_styles = mp.solutions.drawing_styles
-cap = cv2.VideoCapture(camera_index)
+cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW) # Windows 可以用cv2.Cap_DSHOW顯示
 
 
 
