@@ -5,7 +5,7 @@ from datetime import datetime
 
 def record():
     # 初始化攝影機 (你使用的是 index 1 並指定 DirectShow backend)
-    cap = cv2.VideoCapture(1, cv2.CAP_DSHOW)
+    cap = cv2.VideoCapture(2, cv2.CAP_DSHOW)
 
     # 確保攝影機成功開啟
     if not cap.isOpened():
@@ -17,6 +17,10 @@ def record():
     recording = False
     record_start_time = None
     record_duration = 30  # 錄影秒數
+
+    # 初始化 OpenCV 視窗
+    cv2.namedWindow("USB Camera", cv2.WINDOW_NORMAL)
+    cv2.resizeWindow("USB Camera", 1280, 960)
 
     # 取得攝影機畫面尺寸與 FPS
     frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
