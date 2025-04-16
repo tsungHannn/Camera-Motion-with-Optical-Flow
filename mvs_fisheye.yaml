@@ -1,0 +1,26 @@
+image_width: 640
+image_height: 480
+camera_name: fisheye_mono
+camera_matrix:
+  rows: 3
+  cols: 3
+  data: [99.002355,   0.     , 329.406751,
+           0.     , 98.972431 , 240.322845,
+           0.     ,   0.     ,   1.     ]
+distortion_model: plumb_bob
+distortion_coefficients:
+  rows: 1
+  cols: 5
+  data: [-0.045055, 0.001020, 0.000279, -0.000298, 0.000000]
+rectification_matrix:
+  rows: 3
+  cols: 3
+  data: [1., 0., 0.,
+         0., 1., 0.,
+         0., 0., 1.]
+projection_matrix:
+  rows: 3
+  cols: 4
+  data: [171.225570,   0.     , 235.623052,   0.     ,
+           0.     , 233.025748, 237.159295,   0.     ,
+           0.     ,   0.     ,   1.     ,   0.     ]

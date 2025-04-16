@@ -14,7 +14,7 @@ class VideoRecorder:
         self.filepath = "crowd_mp4"
 
         # 讀MV內參
-        with open("mvs.yaml", "r") as file:
+        with open("mvs_fisheye.yaml", "r") as file:
             mvs_data = yaml.load(file, Loader=yaml.FullLoader)
             self.cameraMatrix = np.array(mvs_data['camera_matrix']['data'])
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
@@ -25,7 +25,6 @@ class VideoRecorder:
     def record(self):
         # 初始化攝影機 (你使用的是 index 1 並指定 DirectShow backend)
         cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW)
-        
         
         # 檢查資料夾是否存在
         if not os.path.exists(self.filepath):
@@ -38,8 +37,8 @@ class VideoRecorder:
             exit()
 
         # 初始化錄影器
-        # out = None
-        ffmpeg = None
+        out = None
+        # ffmpeg = None
         recording = False
         record_start_time = None
         record_duration = self.record_duration  # 錄影秒數
@@ -74,9 +73,9 @@ class VideoRecorder:
                 print("無法讀取畫面")
                 break
             
-            # calib_frame = cv2.undistort(frame.copy(), cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
-            calib_frame = frame.copy()
-            # cv2.imshow("USB Camera", frame)
+            calib_frame = cv2.undistort(frame.copy(), cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
+            # calib_frame = frame.copy()
+            cv2.imshow("USB Camera", frame)
             cv2.imshow("Calib Frame", calib_frame)
             yuv = cv2.cvtColor(calib_frame.copy(), cv2.COLOR_BGR2YUV)
             y, u, v = cv2.split(yuv)
@@ -105,41 +104,28 @@ class VideoRecorder:
             # 如果按下 'r' 且尚未在錄影，開始錄製
             if key == ord('r') and not recording:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                # filename = os.path.join(self.filepath, f"{timestamp}.mp4")
-                # fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-                
-                # fourcc = cv2.VideoWriter_fourcc(*'FFV1')  # 無損壓縮
+
                 filename = os.path.join(self.filepath, f"{timestamp}.mp4")
+                fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # MJPEG 壓縮
 
-                # out = cv2.VideoWriter(filename, fourcc, fps, (frame_width, frame_height))
+                # filename = os.path.join(self.filepath, f"{timestamp}.avi")
+                # fourcc = cv2.VideoWriter_fourcc(*'I420') # YUV2 壓縮
+                                
+                # filename = os.path.join(self.filepath, f"{timestamp}.mkv")
+                # fourcc = cv2.VideoWriter_fourcc(*'FFV1')  # 無損壓縮
+                
 
+                out = cv2.VideoWriter(filename, fourcc, fps, (frame_width, frame_height))
 
                 recording = True
                 record_start_time = time.time()
                 print(f"開始錄影：{filename}（{record_duration} 秒）")
-
-                # 建立 ffmpeg pipeline
-                ffmpeg_cmd = [
-                    "ffmpeg",
-                    '-v', '1',
-                    '-stats',
-                    '-r', str(fps),
-                    '-c', 'mjpeg',
-                    '-f', 'mjpeg',
-                    '-i', '-',
-                    '-an',
-                    filename
-                ]
-                ffmpeg = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
-                progress_bar = tqdm(total=record_duration, desc=filename, unit="秒", leave=False)
-
                 progress_bar = tqdm(total=record_duration, desc=filename, unit="秒", leave=False)
                 
 
             # 如果正在錄影，持續寫入影片並檢查是否超過 30 秒
             if recording:
-                # out.write(calib_frame)
-                ffmpeg.stdin.write(calib_frame.tobytes())
+                out.write(calib_frame)
 
                 elapsed = time.time() - record_start_time
                 elapsed_sec = int(elapsed)
@@ -151,11 +137,7 @@ class VideoRecorder:
 
                 if elapsed >= record_duration:
                     recording = False
-
-                    # out.release()
-                    ffmpeg.stdin.close()
-                    ffmpeg.wait()
-                    
+                    out.release()                    
                     progress_bar.n = record_duration
                     progress_bar.refresh()
                     progress_bar.close()
@@ -165,9 +147,7 @@ class VideoRecorder:
             # 離開程式
             if key == ord('q'):
                 if recording:
-                    # out.release()
-                    ffmpeg.stdin.close()
-                    ffmpeg.wait()
+                    out.release()
                     print("錄影結束並儲存。")
                 break
 
@@ -187,6 +167,7 @@ class VideoRecorder:
             fps = cap.get(cv2.CAP_PROP_FPS)
             duration = frame_count / fps if fps > 0 else 0
 
+            print("儲存為:", filename)
             print(f"影片總幀數：{frame_count}")
             print(f"FPS：{fps}")
             print(f"影片長度：{duration:.2f} 秒")
@@ -241,5 +222,8 @@ class VideoRecorder:
 
 if __name__ == "__main__":
     videoRecorder = VideoRecorder()
-    # videoRecorder.record()
-    videoRecorder.replay_mvs("20250416_131847.mp4")
+    videoRecorder.record()
+    # videoRecorder.replay_mvs("test_mvs_compressed.mp4") # ROSBAG 轉成mp4
+    # videoRecorder.replay_mvs("20250416_150545.mp4") # MJPG
+    # videoRecorder.replay_mvs("20250416_150325.mkv") # 無損壓縮
+    # videoRecorder.replay_mvs("20250416_150048.avi") # YUV2
