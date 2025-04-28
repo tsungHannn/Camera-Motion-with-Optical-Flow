@@ -14,7 +14,7 @@ class VideoRecorder:
         self.filepath = "crowd_mp4"
 
         # 讀MV內參
-        with open("mvs_fisheye.yaml", "r") as file:
+        with open("mvs.yaml", "r") as file:
             mvs_data = yaml.load(file, Loader=yaml.FullLoader)
             self.cameraMatrix = np.array(mvs_data['camera_matrix']['data'])
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
@@ -105,14 +105,14 @@ class VideoRecorder:
             if key == ord('r') and not recording:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-                filename = os.path.join(self.filepath, f"{timestamp}.mp4")
-                fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # MJPEG 壓縮
+                # filename = os.path.join(self.filepath, f"{timestamp}.mp4")
+                # fourcc = cv2.VideoWriter_fourcc(*'MJPG')  # MJPEG 壓縮
 
                 # filename = os.path.join(self.filepath, f"{timestamp}.avi")
                 # fourcc = cv2.VideoWriter_fourcc(*'I420') # YUV2 壓縮
                                 
-                # filename = os.path.join(self.filepath, f"{timestamp}.mkv")
-                # fourcc = cv2.VideoWriter_fourcc(*'FFV1')  # 無損壓縮
+                filename = os.path.join(self.filepath, f"{timestamp}.mkv")
+                fourcc = cv2.VideoWriter_fourcc(*'FFV1')  # 無損壓縮
                 
 
                 out = cv2.VideoWriter(filename, fourcc, fps, (frame_width, frame_height))
@@ -125,7 +125,7 @@ class VideoRecorder:
 
             # 如果正在錄影，持續寫入影片並檢查是否超過 30 秒
             if recording:
-                out.write(calib_frame)
+                out.write(frame)
 
                 elapsed = time.time() - record_start_time
                 elapsed_sec = int(elapsed)
