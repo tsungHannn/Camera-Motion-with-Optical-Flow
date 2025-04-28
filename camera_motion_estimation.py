@@ -35,7 +35,7 @@ V: 垂直向量(320*480)  V > 128:向上   V < 128:向下
 class MV_on_Vechicle:
     def __init__(self):
         # 讀MV內參
-        with open("mvs.yaml", "r") as file:
+        with open("mvs_fisheye.yaml", "r") as file:
             mvs_data = yaml.load(file, Loader=yaml.FullLoader)
             self.cameraMatrix = np.array(mvs_data['camera_matrix']['data'])
             self.cameraMatrix = self.cameraMatrix.reshape(3,3)
@@ -51,8 +51,8 @@ class MV_on_Vechicle:
 
 
 		# specify directory and file name
-        self.dir_path = "mvs_mp4\\20250407\\flipped_videos"
-        # self.dir_path = "/media/mvclab/HDD/mvs_mp4/1108/gray"  # mvclab
+        # self.dir_path = "mvs_mp4\\20250407\\flipped_videos"
+        self.dir_path = "/media/mvclab/HDD/mvs_mp4/20250422_fisheye/original"  # mvclab
         # self.all_file = os.listdir(self.dir_path)
         # self.all_file = sorted(self.all_file)
         # print("all_file:", self.all_file)
@@ -64,7 +64,8 @@ class MV_on_Vechicle:
         # self.all_file = ["2024-11-08-03-31-43_mvs_compressed.mp4"] # 1108 edge 換車道
         # self.all_file = ["2024-11-08-03-41-45_mvs_compressed.mp4"] # 1108 edge 巷子裡
         # self.all_file = ["2024-12-20-06-36-00_mvs_compressed.mp4"] # 1220
-        self.all_file = ["flipped_10_mvs_compressed.mp4"] # 20250407
+        # self.all_file = ["flipped_10_mvs_compressed.mp4"] # 20250407
+        self.all_file = ["3_mvs_compressed.mp4"] # 20250422
         # self.all_file = ["test_2024-06-28-10-11-20_mvs.mp4"]
 
 
@@ -180,7 +181,7 @@ class MV_on_Vechicle:
             codec = cv.VideoWriter_fourcc(*'mp4v')
             save_name = "motion_" + filename[:-4] + ".mp4"
             outputResult = cv.VideoWriter(save_name, codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
-            outputStream1 = cv.VideoWriter("output1.mp4", codec, frameRate, (int(cap.get(3) // 2),int(cap.get(4) // 2)))
+            outputStream1 = cv.VideoWriter("output1.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             outputStream2 = cv.VideoWriter("output2.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             outputStream3 = cv.VideoWriter("output3.mp4", codec, frameRate, (int(cap.get(3)),int(cap.get(4))))
             # initialise text variables to draw on frames
@@ -200,8 +201,8 @@ class MV_on_Vechicle:
             # window_left = 0
             # window_right = frame_width
 
-            window_bottom = self.frame_height // 5 * 4
-            window_top = self.frame_height // 5
+            window_bottom = self.frame_height // 4 * 3
+            window_top = self.frame_height // 8
 
 
             # for i in range(self.window_number):
@@ -253,8 +254,8 @@ class MV_on_Vechicle:
                     break
                 
                 cv.imshow("original", nxt)
-
-                # nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
+                original_frame = nxt.copy()
+                nxt = cv.undistort(nxt, cameraMatrix=self.cameraMatrix, distCoeffs=self.distortion_coefficients)
 
 
                 # cv.imshow("after", nxt)
@@ -269,19 +270,19 @@ class MV_on_Vechicle:
 
 
                 # 處理雙目MVS
-                left_edge = y[self.frame_height // 2:self.frame_height, 0:self.frame_width // 2]
-                right_edge = y[self.frame_height // 2:self.frame_height, self.frame_width // 2:self.frame_width]
-                left_u = u[0:self.frame_height // 2, 0:self.frame_width // 2] 
-                left_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
-                right_u = u[0:self.frame_height // 2, 0:self.frame_width // 2]
-                right_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
+                # left_edge = y[self.frame_height // 2:self.frame_height, 0:self.frame_width // 2]
+                # right_edge = y[self.frame_height // 2:self.frame_height, self.frame_width // 2:self.frame_width]
+                # left_u = u[0:self.frame_height // 2, 0:self.frame_width // 2] 
+                # left_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
+                # right_u = u[0:self.frame_height // 2, 0:self.frame_width // 2]
+                # right_v = v[0:self.frame_height // 2, 0:self.frame_width // 2]
 
-                nxt = cv.merge([left_edge, left_u, left_v])
-                nxt = cv.cvtColor(nxt, cv.COLOR_YUV2RGB)
-                nxt = cv.cvtColor(nxt, cv.COLOR_RGB2BGR)
-                # nxt = cv.resize(nxt, (self.frame_width, self.frame_height), interpolation=cv.INTER_CUBIC)
-                cv.imshow("nxt", nxt)
-                outputStream1.write(nxt)
+                # nxt = cv.merge([left_edge, left_u, left_v])
+                # nxt = cv.cvtColor(nxt, cv.COLOR_YUV2RGB)
+                # nxt = cv.cvtColor(nxt, cv.COLOR_RGB2BGR)
+                # # nxt = cv.resize(nxt, (self.frame_width, self.frame_height), interpolation=cv.INTER_CUBIC)
+                # cv.imshow("nxt", nxt)
+                # outputStream1.write(nxt)
 
 
 
@@ -402,15 +403,15 @@ class MV_on_Vechicle:
                     self.window_list.append(average_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     self.comp_window_list.append(average_v[window_top:window_bottom, window_width*i:window_width*(i+1)])
                     
-                    # # 實際偵測範圍
-                    # polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
-                    # polygon = np.array([polygon], dtype=np.int32)
-                    # self.polygon_list.append(polygon)
-
-                    # 示意框
-                    polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    # 實際偵測範圍
+                    polygon = [[window_width*i, window_top], [window_width*(i+1), window_top], [window_width*(i+1),window_bottom], [window_width*i, window_bottom]]
                     polygon = np.array([polygon], dtype=np.int32)
                     self.polygon_list.append(polygon)
+
+                    # # 示意框
+                    # polygon = [[window_width*i, window_top-40], [window_width*(i+1), window_top-40], [window_width*(i+1),window_top -20], [window_width*i, window_top - 20]]
+                    # polygon = np.array([polygon], dtype=np.int32)
+                    # self.polygon_list.append(polygon)
 
 
                 # 畫偵測區域(漸層)
@@ -639,11 +640,11 @@ class MV_on_Vechicle:
 
 
 
-                # outputV = cv.merge((v,v,v))
+                outputV = cv.merge((v,v,v))
                 outputResult.write(yuv_with_polygons)
-                # outputStream1.write(nxt)
-                # outputStream2.write(nxt)
-                # outputStream3.write(gray_with_line)
+                outputStream1.write(original_frame)
+                outputStream2.write(outputV)
+                outputStream3.write(nxt)
 
 
                 # if frame_id == 44:
